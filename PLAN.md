@@ -93,8 +93,24 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
   condition fallback from `true` to `false` — events with un-evaluable
   conditions are now skipped instead of fired. Added error logging to JS
   fallback evaluator.
+- [x] **Portrait mouths keep moving after dialog text finishes scrolling.** *(Fixed)*
+  Event dialog now toggles portrait talking based on dialog typing state
+  (`typing` vs `waiting`) instead of only stopping on full dialog close.
+- [x] **Cutscene background can be missing for first lines after `change_background`.** *(Fixed)*
+  `change_background` now blocks event command progression until panorama load
+  resolves, matching Python's synchronous behavior and preventing async race frames.
 
 ### Recent Changes
+
+- **Event-state dialog/background parity fixes + regression coverage:**
+  - Fixed portrait mouth animation lifecycle in `src/engine/states/game-states.ts`:
+    speaking portraits now start/stop talking on dialog typing-state transitions,
+    and reliably stop on skip/dismiss paths.
+  - Fixed async cutscene background race in `src/engine/states/game-states.ts`:
+    `change_background` now blocks until panorama load completes (or fails),
+    with token-guarded completion to avoid stale async overwrites.
+  - Added regression in `tests/harness.spec.ts`:
+    `Dialog portraits stop talking while waiting for input`.
 
 - **AI region interaction + recruit persistence + Sacred Stones soak automation:**
   - Added two new harness regressions in `tests/harness.spec.ts`:

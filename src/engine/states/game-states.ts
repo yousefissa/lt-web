@@ -5254,9 +5254,13 @@ export class EventState extends State {
 
   // Currently speaking portrait (for talk animation)
   private speakingPortrait: EventPortrait | null = null;
+  private wasDialogTyping: boolean = false;
 
   // Background panorama image (drawn behind portraits, on top of map)
   private background: HTMLImageElement | null = null;
+  private pendingBackgroundLoad: boolean = false;
+  private backgroundLoadDone: boolean = false;
+  private backgroundLoadToken: number = 0;
 
   // Chapter title overlay state
   private chapterTitlePhase: 'none' | 'fade_in' | 'hold' | 'fade_out' = 'none';
@@ -5311,7 +5315,11 @@ export class EventState extends State {
       this.portraitPriorityCounter = 1;
       this.pendingPortraitLoads = 0;
       this.speakingPortrait = null;
+      this.wasDialogTyping = false;
       this.background = null;
+      this.pendingBackgroundLoad = false;
+      this.backgroundLoadDone = false;
+      this.backgroundLoadToken++;
       this.chapterTitlePhase = 'none';
       this.chapterTitleTimer = 0;
       this.chapterTitleText = '';
@@ -5346,6 +5354,7 @@ export class EventState extends State {
           this.speakingPortrait.stopTalking();
           this.speakingPortrait = null;
         }
+        this.wasDialogTyping = false;
         this.advancePointer();
         return;
       }
@@ -5356,6 +5365,7 @@ export class EventState extends State {
           this.speakingPortrait.stopTalking();
           this.speakingPortrait = null;
         }
+        this.wasDialogTyping = false;
         this.advancePointer();
       }
       return;
@@ -5443,9 +5453,19 @@ export class EventState extends State {
           this.speakingPortrait.stopTalking();
           this.speakingPortrait = null;
         }
+        this.wasDialogTyping = false;
         this.advancePointer();
       } else {
         this.dialog.update();
+        const isTyping = this.dialog.isTyping();
+        if (this.speakingPortrait) {
+          if (isTyping && !this.wasDialogTyping) {
+            this.speakingPortrait.startTalking();
+          } else if (!isTyping && this.wasDialogTyping) {
+            this.speakingPortrait.stopTalking();
+          }
+        }
+        this.wasDialogTyping = isTyping;
         return;
       }
     }
@@ -5599,6 +5619,17 @@ export class EventState extends State {
     // portraits map for subsequent commands that reference it by name.
     if (this.pendingPortraitLoads > 0) {
       return;
+    }
+
+    // Block while a panorama from change_background is loading.
+    if (this.pendingBackgroundLoad) {
+      if (this.backgroundLoadDone) {
+        this.pendingBackgroundLoad = false;
+        this.backgroundLoadDone = false;
+        this.advancePointer();
+      } else {
+        return;
+      }
     }
 
     // --- Burst-process commands ---
@@ -5774,6 +5805,7 @@ export class EventState extends State {
       this.speakingPortrait.stopTalking();
       this.speakingPortrait = null;
     }
+    this.wasDialogTyping = false;
 
     // --- Check win/lose flags (matches Python end_event logic) ---
 
@@ -5835,6 +5867,9 @@ export class EventState extends State {
       this.portraitPriorityCounter = 1;
       this.pendingPortraitLoads = 0;
       this.background = null;
+      this.pendingBackgroundLoad = false;
+      this.backgroundLoadDone = false;
+      this.backgroundLoadToken++;
       this.chapterTitleTimer = 0;
       this.chapterTitlePhase = 'none';
       this.locationCard = null;
@@ -5843,6 +5878,9 @@ export class EventState extends State {
       this.portraits.clear();
       this.pendingPortraitLoads = 0;
       this.background = null;
+      this.pendingBackgroundLoad = false;
+      this.backgroundLoadDone = false;
+      this.backgroundLoadToken++;
       this.chapterTitleTimer = 0;
       this.chapterTitlePhase = 'none';
       this.locationCard = null;
@@ -6216,7 +6254,6 @@ export class EventState extends State {
         const noTalk = flagArgs.includes('no_talk');
 
         if (portrait && !noTalk && cmd.type !== 'narrate') {
-          portrait.startTalking();
           this.speakingPortrait = portrait;
 
           // Raise portrait priority (bring to front) unless low_priority
@@ -6227,6 +6264,7 @@ export class EventState extends State {
 
         // Create dialog with optional portrait reference for positioning
         this.dialog = new Dialog(text, speaker || undefined, portrait ?? undefined);
+        this.wasDialogTyping = false;
 
         // Don't advance pointer — it's advanced when dialog finishes (in takeInput)
         return true;
@@ -7902,15 +7940,42 @@ export class EventState extends State {
         if (!bgNid) {
           // Remove background
           this.background = null;
+          this.pendingBackgroundLoad = false;
+          this.backgroundLoadDone = false;
+          this.backgroundLoadToken++;
+          if (!bgFlagSet.has('keep_portraits')) {
+            this.portraits.clear();
+          }
+          this.advancePointer();
+          return false;
         } else {
-          // Load panorama image asynchronously
+          // Load panorama image asynchronously and block command progression
+          // until the load resolves to match Python's synchronous semantics.
           const game = getGame();
           const panoramaNid = bgNid;
-          game.resourceManager?.loadPanorama(panoramaNid).then((img: HTMLImageElement) => {
-            this.background = img;
-          }).catch(() => {
-            console.warn(`EventState: panorama "${panoramaNid}" not found`);
-          });
+          const token = ++this.backgroundLoadToken;
+          this.pendingBackgroundLoad = true;
+          this.backgroundLoadDone = false;
+
+          const resourcePromise = game.resourceManager?.loadPanorama(panoramaNid);
+          if (!resourcePromise) {
+            this.backgroundLoadDone = true;
+          } else {
+            resourcePromise.then((img: HTMLImageElement) => {
+              if (this.backgroundLoadToken === token) {
+                this.background = img;
+              }
+            }).catch(() => {
+              console.warn(`EventState: panorama "${panoramaNid}" not found`);
+              if (this.backgroundLoadToken === token) {
+                this.background = null;
+              }
+            }).finally(() => {
+              if (this.backgroundLoadToken === token) {
+                this.backgroundLoadDone = true;
+              }
+            });
+          }
         }
 
         // By default, change_background clears all portraits
@@ -7918,8 +7983,7 @@ export class EventState extends State {
           this.portraits.clear();
         }
 
-        this.advancePointer();
-        return false;
+        return true;
       }
 
       // ----- Chapter Title -----

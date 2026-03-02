@@ -37,3 +37,7 @@
   so prompt titles stay short and avoid Discord attachment fallback.
 - Magic sword harness regression should assert deterministic execution signals (state resolution,
   weapon uses decrement) rather than RNG-dependent HP damage.
+- Event dialog parity: portrait mouth animation must follow dialog typing state, not just dialog
+  lifetime. Stop talking when dialog enters waiting/pause and only animate during active typing.
+- Event background parity: `change_background` should block event progression until panorama load
+  resolves; async non-blocking loads can cause first cutscene lines to render without background.

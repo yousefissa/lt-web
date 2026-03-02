@@ -11,6 +11,7 @@ When making modifications, you should generally plan out what to do in PLAN.md, 
 **Important:** Always update PLAN.md when you complete tasks (check off items, update line counts, add to "Recent Changes") or discover new tasks/bugs (add them to the appropriate section). PLAN.md is the source of truth for project status.
 
 **Commit policy:** Always commit and push changes without asking for confirmation. Do not prompt the user before committing or pushing.
+After finishing implementation work, create a commit and push it to the current branch.
 
 ---
 

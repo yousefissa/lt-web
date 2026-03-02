@@ -2928,6 +2928,64 @@ test.describe('Level Progression', () => {
     await saveScreenshot(page, '25-ch1-intro-cutscene');
   });
 
+  test('Dialog portraits stop talking while waiting for input', async ({ page }) => {
+    // Regression: portraits should stop mouth animation once text is fully
+    // revealed and dialog enters waiting state.
+    await page.goto('/?harness=true&level=1&clean=false&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    let sawTypingDialog = false;
+    let stoppedOnWait = false;
+
+    for (let i = 0; i < 800; i++) {
+      await stepFrames(page, 2, i % 3 === 0 ? 'SELECT' : null);
+
+      const probe = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        const es = g?.state?.getCurrentState?.();
+        if (!es || es.name !== 'event') return null;
+        const dialog = (es as any).dialog;
+        if (!dialog) return null;
+        const speakingPortrait = (es as any).speakingPortrait;
+        return {
+          dialogState: (dialog as any).state ?? '',
+          talkOn: speakingPortrait ? Boolean((speakingPortrait as any).talkOn) : null,
+        };
+      });
+
+      if (!probe) continue;
+      if (probe.dialogState !== 'typing') continue;
+
+      sawTypingDialog = true;
+
+      // Force this line to finish typing, then allow one update tick.
+      await stepFrames(page, 1, 'SELECT');
+      await stepFrames(page, 1);
+
+      const after = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        const es = g?.state?.getCurrentState?.();
+        if (!es || es.name !== 'event') return null;
+        const dialog = (es as any).dialog;
+        if (!dialog) return null;
+        const speakingPortrait = (es as any).speakingPortrait;
+        return {
+          dialogState: (dialog as any).state ?? '',
+          talkOn: speakingPortrait ? Boolean((speakingPortrait as any).talkOn) : null,
+        };
+      });
+
+      if (after && after.dialogState === 'waiting' && after.talkOn === false) {
+        stoppedOnWait = true;
+        break;
+      }
+    }
+
+    expect(sawTypingDialog).toBe(true);
+    expect(stoppedOnWait).toBe(true);
+  });
+
   test('Prologue win_game transitions to Chapter 1', async ({ page }) => {
     // Load Prologue in clean mode (no level_start events)
     await page.goto('/?harness=true&level=0&bundle=false');

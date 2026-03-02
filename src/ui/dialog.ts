@@ -402,6 +402,11 @@ export class Dialog {
     return this.state === 'done';
   }
 
+  /** True while the typewriter is actively advancing characters. */
+  isTyping(): boolean {
+    return this.state === 'typing';
+  }
+
   /** Finish typing the current line instantly. */
   private _finishCurrentLine(): void {
     const currentLineText = this.lines[this.currentLine] ?? '';
