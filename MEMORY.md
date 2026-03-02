@@ -17,5 +17,8 @@
 - `evaluateCondition(unit.can_unlock(region))` must handle runtime item components stored as
   `Map<string, any>`, not just array-shaped components. Include `can_unlock` expression handling
   (e.g. `region.nid.startswith('Chest')` / `'Door'`) for correct Chest/Door menu gating.
+- In multi-step interaction tests, prior actions can leave units with `finished=true`; either reset
+  per-turn flags explicitly or reload the level cleanly between cases to avoid false negatives when
+  forcing `menu` state.
 - Magic sword harness regression should assert deterministic execution signals (state resolution,
   weapon uses decrement) rather than RNG-dependent HP damage.

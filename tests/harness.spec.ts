@@ -1105,6 +1105,10 @@ test.describe('Sacred Stones Chapter Mechanics', () => {
         const g = (window as any).__gameRef;
         const eirika = g?.units?.get?.('Eirika');
         if (!g || !g.board || !eirika) return false;
+        eirika.finished = false;
+        eirika.hasMoved = false;
+        eirika.hasAttacked = false;
+        eirika.hasTraded = false;
         g.board.moveUnit(eirika, x, y);
         g.cursor.setPos(x, y);
         g.selectedUnit = eirika;
@@ -1288,6 +1292,177 @@ test.describe('Sacred Stones Chapter Mechanics', () => {
     expect(result.doorKeyUses).toBeNull();
 
     await saveScreenshot(page, '40-ch3-door1-unlock-opened');
+  });
+
+  test('Chapter 3 all chest regions unlock and grant correct loot', async ({ page }) => {
+    await page.goto('/?harness=true&level=3&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const chests = [
+      { nid: 'Chest2', x: 6, y: 3, loot: 'Iron_Lance' },
+      { nid: 'Chest3', x: 8, y: 3, loot: 'Hand_Axe' },
+      { nid: 'Chest4', x: 10, y: 3, loot: 'Iron_Sword' },
+    ];
+
+    for (const chest of chests) {
+      await page.evaluate(async () => {
+        await (window as any).__harness.loadLevelClean('3');
+      });
+      await stepFrames(page, 6);
+
+      const gaveKey = await page.evaluate(() => {
+        const h = (window as any).__harness;
+        return h?.giveItem?.('Eirika', 'Chest_Key') ?? false;
+      });
+      expect(gaveKey).toBe(true);
+
+      const setup = await page.evaluate(({ x, y }: { x: number; y: number }) => {
+        const g = (window as any).__gameRef;
+        const eirika = g?.units?.get?.('Eirika');
+        if (!g || !g.board || !eirika) return false;
+        eirika.finished = false;
+        eirika.hasMoved = false;
+        eirika.hasAttacked = false;
+        eirika.hasTraded = false;
+        g.board.moveUnit(eirika, x, y);
+        g.cursor.setPos(x, y);
+        g.selectedUnit = eirika;
+        g._moveOrigin = [x, y];
+        g.state.change('menu');
+        return true;
+      }, { x: chest.x, y: chest.y });
+      expect(setup).toBe(true);
+
+      await stepFrames(page, 8);
+
+      const chestProbe = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        const st = g?.state?.getCurrentState?.();
+        const eirika = g?.units?.get?.('Eirika');
+        if (!st || st.name !== 'menu' || !st.menu) {
+          return {
+            ok: false,
+            state: st?.name ?? null,
+            labels: [],
+            pos: eirika?.position ?? null,
+            hasChestKey: (eirika?.items ?? []).some((it: any) => it?.nid === 'Chest_Key'),
+          };
+        }
+        const labels = st.menu.options.map((o: any) => o?.label);
+        const idx = st.menu.options.findIndex((o: any) => o?.label === 'Chest');
+        if (idx < 0) {
+          return {
+            ok: false,
+            state: st.name,
+            labels,
+            pos: eirika?.position ?? null,
+            hasChestKey: (eirika?.items ?? []).some((it: any) => it?.nid === 'Chest_Key'),
+          };
+        }
+        st.menu.selectedIndex = idx;
+        return { ok: true, state: st.name, labels };
+      });
+      expect(chestProbe.ok).toBe(true);
+
+      await stepFrames(page, 2, 'SELECT');
+      await settle(page, 250);
+
+      const result = await page.evaluate(({ regionNid, lootNid }: { regionNid: string; lootNid: string }) => {
+        const g = (window as any).__gameRef;
+        const eirika = g?.units?.get?.('Eirika');
+        const itemNids = (eirika?.items ?? []).map((it: any) => it?.nid);
+        const regionStillPresent = (g?.currentLevel?.regions ?? []).some((r: any) => r?.nid === regionNid);
+        return {
+          hasLoot: itemNids.includes(lootNid),
+          regionStillPresent,
+        };
+      }, { regionNid: chest.nid, lootNid: chest.loot });
+
+      expect(result.hasLoot).toBe(true);
+      expect(result.regionStillPresent).toBe(false);
+    }
+
+    await saveScreenshot(page, '41-ch3-all-chests-unlocked');
+  });
+
+  test('Chapter 3 remaining door regions unlock with key', async ({ page }) => {
+    await page.goto('/?harness=true&level=3&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const doors = [
+      { nid: 'Door2', x: 6, y: 10 },
+      { nid: 'Door3', x: 10, y: 5 },
+    ];
+
+    for (const door of doors) {
+      await page.evaluate(async () => {
+        await (window as any).__harness.loadLevelClean('3');
+      });
+      await stepFrames(page, 6);
+
+      const gaveKey = await page.evaluate(() => {
+        const h = (window as any).__harness;
+        return h?.giveItem?.('Eirika', 'Door_Key') ?? false;
+      });
+      expect(gaveKey).toBe(true);
+
+      const setup = await page.evaluate(({ x, y }: { x: number; y: number }) => {
+        const g = (window as any).__gameRef;
+        const eirika = g?.units?.get?.('Eirika');
+        if (!g || !g.board || !eirika) return false;
+        g.board.moveUnit(eirika, x, y);
+        g.cursor.setPos(x, y);
+        g.selectedUnit = eirika;
+        g._moveOrigin = [x, y];
+        g.state.change('menu');
+        return true;
+      }, { x: door.x, y: door.y });
+      expect(setup).toBe(true);
+
+      await stepFrames(page, 8);
+
+      const doorProbe = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        const st = g?.state?.getCurrentState?.();
+        const eirika = g?.units?.get?.('Eirika');
+        if (!st || st.name !== 'menu' || !st.menu) {
+          return {
+            ok: false,
+            state: st?.name ?? null,
+            labels: [],
+            pos: eirika?.position ?? null,
+            hasDoorKey: (eirika?.items ?? []).some((it: any) => it?.nid === 'Door_Key'),
+          };
+        }
+        const labels = st.menu.options.map((o: any) => o?.label);
+        const idx = st.menu.options.findIndex((o: any) => o?.label === 'Door');
+        if (idx < 0) {
+          return {
+            ok: false,
+            state: st.name,
+            labels,
+            pos: eirika?.position ?? null,
+            hasDoorKey: (eirika?.items ?? []).some((it: any) => it?.nid === 'Door_Key'),
+          };
+        }
+        st.menu.selectedIndex = idx;
+        return { ok: true, state: st.name, labels };
+      });
+      expect(doorProbe.ok).toBe(true);
+
+      await stepFrames(page, 2, 'SELECT');
+      await settle(page, 250);
+
+      const doorStillPresent = await page.evaluate((regionNid: string) => {
+        const g = (window as any).__gameRef;
+        return (g?.currentLevel?.regions ?? []).some((r: any) => r?.nid === regionNid);
+      }, door.nid);
+      expect(doorStillPresent).toBe(false);
+    }
+
+    await saveScreenshot(page, '42-ch3-door2-door3-unlocked');
   });
 });
 

@@ -92,6 +92,16 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 ### Recent Changes
 
+- **Chapter 3 full lock interaction sweep (all chest/door variants):**
+  - Added mechanics regressions in `tests/harness.spec.ts` for:
+    - All remaining Ch.3 chests (`Chest2/3/4`) unlock + loot checks
+    - Remaining Ch.3 doors (`Door2/3`) unlock + region removal checks
+  - Hardened harness flow by reloading clean Ch.3 per lock interaction case to
+    avoid cross-case turn-state contamination from finished action flags.
+  - Added screenshots:
+    `41-ch3-all-chests-unlocked.png`,
+    `42-ch3-door2-door3-unlocked.png`.
+  - Full Playwright harness suite now passes: **33/33**.
 - **Chapter 3 unlock interaction coverage + can_unlock fix:**
   - Added mechanics regressions in `tests/harness.spec.ts` for:
     - Ch.3 chest interaction gating + unlock + loot (`Javelin`)
