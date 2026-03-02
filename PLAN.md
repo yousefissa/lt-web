@@ -38,6 +38,24 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 ### Known Bugs
 
+- [x] **Talk command menu missed level-scoped conversations (e.g. Natasha→Joshua in Ch.5).** *(Fixed)*
+  Talk option detection in `MenuState` called `getEventsForTrigger()` without
+  `levelNid`, so level-specific `on_talk` events were filtered out. Added
+  `levelNid` in both talk option discovery and talk target re-check.
+- [x] **Harness chapter intros (Ch.2/Ch.3) intermittently soft-locked with empty top state.** *(Fixed)*
+  `harness.loadLevel(clean=false)` was manually pushing `event` after `free`, while
+  `FreeState` already auto-pushes `event` when level_start events exist. This could stack
+  duplicate `EventState` instances and leave transient/empty state behavior in long intros.
+  Fix: removed manual event push from harness and let normal state flow handle it.
+- [x] **Animation combat sometimes shows cyan/red placeholder blocks.** *(Fixed)*
+  `AnimationCombat` now waits in `init` until both sides resolve a real
+  `mainFrame` (or timeout fail-safe), preventing first-load async sprite races
+  from flashing stub rectangles at combat start.
+- [x] **Harness mode blocked by project picker overlay.** *(Fixed)* When
+  multiple `.ltproj` folders existed and `?project=` was omitted, the picker
+  overlay prevented `window.__harness.ready` from ever becoming true. Harness
+  mode now auto-selects `default.ltproj` (or first discovered project fallback)
+  without redirect, restoring deterministic Playwright startup.
 - [x] **First dialogue still renders over the portrait.** *(Fixed)* Dialog now
   auto-sizes to text content width and uses `get_desired_center()` mapping for
   portrait-aware horizontal positioning (matching Python).
@@ -70,6 +88,43 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 ### Recent Changes
 
+- **Deeper Sacred Stones chapter sweep (Ch.2–Ch.5 mechanics):**
+  - Added chapter mechanics tests in `tests/harness.spec.ts`:
+    - Ch.3 seize objective transitions to Ch.4
+    - Ch.4 turn-2 reinforcements (`Turn2Rein`) spawn
+    - Ch.5 turn-2 and turn-8 brigand reinforcements spawn
+    - Ch.5 Natasha→Joshua talk recruitment converts Joshua to player team
+  - Fixed talk menu regression in `src/engine/states/game-states.ts` by passing
+    `levelNid` into `getEventsForTrigger()` for `on_talk` checks.
+  - Added screenshots:
+    `32-ch3-seize-transition-ch4.png`, `33-ch4-turn2-reinforcements.png`,
+    `34-ch5-turn2-turn8-reinforcements.png`, `35-ch5-natasha-recruits-joshua.png`.
+  - Full Playwright harness suite now passes with expanded coverage: **26/26**.
+- **Sacred Stones multi-chapter smoke coverage + harness state fix:**
+  - Added chapter smoke tests for Ch.2–Ch.5 in `tests/harness.spec.ts`:
+    clean-mode map load checks + non-clean intro progress checks.
+  - Added screenshots for each chapter intro/map checkpoint:
+    `30-ch{2..5}-clean-map.png`, `31-ch{2..5}-intro-progress.png`.
+  - Fixed duplicate `EventState` stacking in `src/harness.ts` by removing
+    redundant manual `change('event')` in `loadLevel()`.
+  - Full harness suite now passes with expanded coverage: **22/22**.
+- **Animation combat sprite-load race fix + regression test:**
+  - Fixed startup race in `src/combat/animation-combat.ts`: `updateInit()` now
+    gates transition to visible phases until both combatants have resolved
+    `mainFrame` draw data, with a 1500ms fail-safe timeout.
+  - Added Playwright regression in `tests/harness.spec.ts`:
+    `Animation Combat Rendering › combat sprites resolve before visible
+    animation phases (no stub boxes)`.
+  - Captures `test-screenshots/26-animation-combat-no-stubs.png`.
+  - Full harness suite now passes: **14/14**.
+- **Harness + visual regression stabilization (Sacred Stones test run):**
+  - Fixed harness boot regression in `main.ts`: project picker is now bypassed
+    in `?harness=true` runs, defaulting to `default.ltproj` for deterministic
+    automated tests.
+  - Fixed flaky magic-sword regression assertion in `tests/harness.spec.ts`:
+    test now verifies deterministic weapon-use consumption (`Light Brand` uses
+    decremented) instead of requiring guaranteed HP damage on RNG-dependent hit.
+  - Re-ran full harness suite after fixes: **13/13 passing**.
 - **Seven bug fixes across combat, UI, events, and state management:**
   1. **Dialog over portrait:** Auto-sized dialog width to text content, ported
      Python's `get_desired_center()` mapping for portrait-relative positioning.

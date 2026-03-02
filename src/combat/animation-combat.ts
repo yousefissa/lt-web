@@ -33,6 +33,7 @@ const PLATFORM_SHAKE: [number, number][] = [[0,1],[0,0],[0,-1],[0,0],[0,1],[0,0]
 const FADE_DURATION_MS = 250;
 const ENTRANCE_FRAMES = 14;
 const INIT_PAUSE_FRAMES = 25;
+const SPRITE_LOAD_WAIT_MS = 1500;
 const HP_DRAIN_MIN_FRAMES = 10;
 const HP_DRAIN_MAX_FRAMES = 40;
 const FADE_OUT_DURATION_MS = 250;
@@ -424,8 +425,22 @@ export class AnimationCombat implements AnimationCombatOwner {
   // ================================================================
 
   private updateInit(): boolean {
-    // One-frame setup
-    this.transition('fade_in');
+    // Wait for both combatants to have at least one resolved main frame before
+    // entering the visible animation phases. This prevents placeholder debug
+    // stubs (solid cyan/red blocks) from flashing on first-load combats while
+    // spritesheets are still loading asynchronously.
+    const leftReady = this.leftAnim.getDrawData().mainFrame != null;
+    const rightReady = this.rightAnim.getDrawData().mainFrame != null;
+    if (leftReady && rightReady) {
+      this.transition('fade_in');
+      return false;
+    }
+
+    // Fail-safe: if assets are still missing after a short wait, continue so
+    // combat cannot stall forever due to missing/invalid resources.
+    if (this.stateTimer >= SPRITE_LOAD_WAIT_MS) {
+      this.transition('fade_in');
+    }
     return false;
   }
 

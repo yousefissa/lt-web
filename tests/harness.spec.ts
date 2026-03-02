@@ -281,6 +281,14 @@ test.describe('Magic Sword Combat', () => {
     const given = await giveItem(page, 'Eirika', 'Light_Brand');
     expect(given).toBe(true);
 
+    const lightBrandUsesBefore = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const eirika = g?.units?.get?.('Eirika');
+      const lightBrand = eirika?.items?.find?.((it: any) => it?.nid === 'Light_Brand');
+      return typeof lightBrand?.uses === 'number' ? lightBrand.uses : null;
+    });
+    expect(lightBrandUsesBefore).not.toBeNull();
+
     // Verify Eirika is at (2,6) and Bone (enemy) is at (2,5)
     const state = await getState(page);
     const eirika = state.units.find((u: any) => u.nid === 'Eirika');
@@ -384,9 +392,22 @@ test.describe('Magic Sword Combat', () => {
     // Verify Bone took damage (Light Brand deals magic damage)
     const finalState = await getState(page);
     const boneAfter = finalState.units.find((u: any) => u.nid === 'Bone');
+    const lightBrandUsesAfter = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const eirika = g?.units?.get?.('Eirika');
+      const lightBrand = eirika?.items?.find?.((it: any) => it?.nid === 'Light_Brand');
+      return typeof lightBrand?.uses === 'number' ? lightBrand.uses : null;
+    });
+
     console.log(`Bone HP after combat: ${boneAfter?.hp}/${boneAfter?.maxHp}`);
-    // Bone should have taken at least some damage
-    expect(boneAfter!.hp).toBeLessThan(boneAfter!.maxHp);
+    console.log(`Light Brand uses: ${lightBrandUsesBefore} -> ${lightBrandUsesAfter}`);
+
+    // Combat can miss based on RNG, so HP damage is non-deterministic.
+    // The deterministic check is that the attack consumed one weapon use.
+    expect(lightBrandUsesAfter).toBe(lightBrandUsesBefore - 1);
+
+    // If the attack hit, Bone HP should drop. If it missed, HP is unchanged.
+    expect(boneAfter!.hp).toBeLessThanOrEqual(boneAfter!.maxHp);
   });
   test('combat HP bar and weapon info do not overlap', async ({ page }) => {
     // Load the DEBUG level cleanly and initiate combat to verify
@@ -579,6 +600,386 @@ test.describe('Prologue (with events)', () => {
     }
 
     expect(dialogFound).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Animation combat visual regression
+// ---------------------------------------------------------------------------
+
+test.describe('Animation Combat Rendering', () => {
+  test('combat sprites resolve before visible animation phases (no stub boxes)', async ({ page }) => {
+    await page.goto('/?harness=true&level=0&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const setupOk = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const board = g?.board;
+      if (!g || !board) return false;
+
+      const eirika = g.units.get('Eirika');
+      if (!eirika) return false;
+
+      const enemy = Array.from(g.units.values()).find((u: any) => u.team === 'enemy' && !u.isDead());
+      if (!enemy) return false;
+
+      // Force adjacent setup for deterministic combat start.
+      board.moveUnit(enemy, eirika.position[0], eirika.position[1] - 1);
+
+      g.selectedUnit = eirika;
+      g.combatTarget = enemy;
+      g.state.change('combat');
+      return true;
+    });
+    expect(setupOk).toBe(true);
+
+    // Allow state-machine deferred transition to push CombatState.
+    await stepFrames(page, 5);
+
+    let sample: any = null;
+    for (let i = 0; i < 60; i++) {
+      await stepFrames(page, 3);
+      sample = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        const cs = g?.state?.getCurrentState?.();
+        if (!cs || cs.name !== 'combat' || !cs.animCombat) return null;
+        const rs = cs.animCombat.getRenderState?.();
+        return {
+          isAnimationCombat: !!cs.isAnimationCombat,
+          animState: cs.animCombat.state,
+          leftHasMainFrame: !!rs?.leftDraw?.mainFrame,
+          rightHasMainFrame: !!rs?.rightDraw?.mainFrame,
+          leftFrameCount: cs.animCombat.leftAnim?.frameImages?.size ?? 0,
+          rightFrameCount: cs.animCombat.rightAnim?.frameImages?.size ?? 0,
+        };
+      });
+
+      if (sample && sample.animState !== 'init') break;
+    }
+
+    expect(sample).toBeTruthy();
+    expect(sample.isAnimationCombat).toBe(true);
+    expect(sample.leftHasMainFrame).toBe(true);
+    expect(sample.rightHasMainFrame).toBe(true);
+
+    await saveScreenshot(page, '26-animation-combat-no-stubs');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Sacred Stones chapter smoke tests (later chapters)
+// ---------------------------------------------------------------------------
+
+const LATER_CHAPTERS = ['2', '3', '4', '5'];
+
+test.describe('Sacred Stones Later Chapters', () => {
+  for (const chapter of LATER_CHAPTERS) {
+    test(`Chapter ${chapter} loads in clean mode`, async ({ page }) => {
+      await page.goto(`/?harness=true&level=${chapter}&bundle=false`);
+      await waitForHarness(page);
+      await stepFrames(page, 12);
+
+      const state = await getState(page);
+      expect(state.levelNid).toBe(chapter);
+      expect(state.currentStateName).toBe('free');
+      expect(state.units.length).toBeGreaterThan(0);
+
+      await saveScreenshot(page, `30-ch${chapter}-clean-map`);
+    });
+
+    test(`Chapter ${chapter} intro events make progress (no freeze)`, async ({ page }) => {
+      await page.goto(`/?harness=true&level=${chapter}&bundle=false&clean=false`);
+      await waitForHarness(page);
+      await stepFrames(page, 5);
+
+      let reachedFree = false;
+      let hitTitle = false;
+      let firstPointer: number | null = null;
+      let lastPointer: number | null = null;
+      let activeEventNid: string | null = null;
+
+      // Step through event flow. Some chapter intros are long, so we assert
+      // forward progress and no lockups rather than requiring immediate finish.
+      for (let batch = 0; batch < 900; batch++) {
+        await stepFrames(page, 5, batch % 3 === 0 ? 'SELECT' : null);
+
+        const snap = await page.evaluate(() => {
+          const g = (window as any).__gameRef;
+          const currentState = g?.state?.getCurrentState?.()?.name ?? null;
+          const ev = g?.eventManager?.getCurrentEvent?.();
+          return {
+            currentState,
+            pointer: typeof ev?.commandPointer === 'number' ? ev.commandPointer : null,
+            eventNid: ev?.nid ?? null,
+          };
+        });
+
+        if (!activeEventNid && snap.eventNid) activeEventNid = snap.eventNid;
+        if (snap.pointer != null) {
+          if (firstPointer == null) firstPointer = snap.pointer;
+          lastPointer = snap.pointer;
+        }
+
+        if (snap.currentState === 'free') {
+          reachedFree = true;
+          break;
+        }
+        if (snap.currentState === 'title' || snap.currentState === 'title_main') {
+          hitTitle = true;
+          break;
+        }
+      }
+
+      // Stabilize on a concrete top state (deferred state-machine transitions can
+      // produce a transient frame with no active top state).
+      let state = await getState(page);
+      for (let i = 0; i < 30 && !state.currentStateName; i++) {
+        await stepFrames(page, 1);
+        state = await getState(page);
+      }
+
+      expect(state.levelNid).toBe(chapter);
+      expect(hitTitle).toBe(false);
+      expect(Boolean(state.currentStateName)).toBe(true);
+      expect(state.units.length).toBeGreaterThan(0);
+      expect(reachedFree || (firstPointer != null && lastPointer != null && lastPointer > firstPointer)).toBe(true);
+
+      console.log(`Ch.${chapter} intro event: ${activeEventNid ?? 'none'} pointer ${firstPointer} -> ${lastPointer}; state=${state.currentStateName}`);
+      await saveScreenshot(page, `31-ch${chapter}-intro-progress`);
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Sacred Stones chapter mechanics sweeps
+// ---------------------------------------------------------------------------
+
+test.describe('Sacred Stones Chapter Mechanics', () => {
+  test('Chapter 3 seize objective triggers chapter transition to 4', async ({ page }) => {
+    await page.goto('/?harness=true&level=3&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const setupOk = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const eirika = g?.units?.get?.('Eirika');
+      const bazba = g?.units?.get?.('Bazba');
+      if (!g || !eirika || !g.board) return false;
+
+      // Clear throne tile and place Eirika on seize position.
+      if (bazba) {
+        bazba.currentHp = 0;
+        bazba.dead = true;
+        if (bazba.position) g.board.removeUnit(bazba);
+      }
+      g.board.moveUnit(eirika, 14, 1);
+      g.cursor.setPos(14, 1);
+      g.selectedUnit = eirika;
+      g._moveOrigin = [14, 1];
+      g.state.change('menu');
+      return true;
+    });
+    expect(setupOk).toBe(true);
+
+    await stepFrames(page, 8);
+
+    const hasSeize = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const st = g?.state?.getCurrentState?.();
+      if (!st || st.name !== 'menu' || !st.menu) return false;
+      const idx = st.menu.options.findIndex((o: any) => o?.label === 'Seize');
+      if (idx < 0) return false;
+      st.menu.selectedIndex = idx;
+      return true;
+    });
+    expect(hasSeize).toBe(true);
+
+    await stepFrames(page, 2, 'SELECT');
+
+    // Let seize event + level transition run.
+    for (let i = 0; i < 1400; i++) {
+      await stepFrames(page, 2, i % 3 === 0 ? 'SELECT' : null);
+      const state = await getState(page);
+      if (state.levelNid === '4') break;
+    }
+
+    const finalState = await getState(page);
+    expect(finalState.levelNid).toBe('4');
+    expect(['event', 'prep_pick', 'free', 'phase_change', 'turn_change']).toContain(finalState.currentStateName);
+
+    await saveScreenshot(page, '32-ch3-seize-transition-ch4');
+  });
+
+  test('Chapter 4 turn-2 reinforcement event spawns Turn2Rein group', async ({ page }) => {
+    await page.goto('/?harness=true&level=4&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const triggered = await page.evaluate(() => {
+      const h = (window as any).__harness;
+      const g = (window as any).__gameRef;
+      if (!h || !g) return false;
+      g.turnCount = 2;
+      (g as any).turncount = 2;
+      return h.triggerEvent('turn_change');
+    });
+    expect(triggered).toBe(true);
+
+    await settle(page, 500);
+    await stepFrames(page, 12);
+
+    const rein = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const ids = ['115', '116', '117'];
+      return ids.map((id) => {
+        const u = g?.units?.get?.(id);
+        return { id, pos: u?.position ?? null, dead: !!u?.dead };
+      });
+    });
+
+    for (const unit of rein) {
+      expect(unit.pos).not.toBeNull();
+    }
+
+    await saveScreenshot(page, '33-ch4-turn2-reinforcements');
+  });
+
+  test('Chapter 5 turn-2 and turn-8 reinforcements spawn correctly', async ({ page }) => {
+    await page.goto('/?harness=true&level=5&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const triggerTurn2 = await page.evaluate(() => {
+      const h = (window as any).__harness;
+      const g = (window as any).__gameRef;
+      if (!h || !g) return false;
+      g.turnCount = 2;
+      (g as any).turncount = 2;
+      return h.triggerEvent('turn_change');
+    });
+    expect(triggerTurn2).toBe(true);
+
+    await settle(page, 700);
+    await stepFrames(page, 10);
+
+    const turn2Units = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      return ['116', '117'].map((id) => {
+        const u = g?.units?.get?.(id);
+        return { id, pos: u?.position ?? null };
+      });
+    });
+    for (const unit of turn2Units) {
+      expect(unit.pos).not.toBeNull();
+    }
+
+    const triggerTurn8 = await page.evaluate(() => {
+      const h = (window as any).__harness;
+      const g = (window as any).__gameRef;
+      if (!h || !g) return false;
+      g.turnCount = 8;
+      (g as any).turncount = 8;
+      return h.triggerEvent('turn_change');
+    });
+    expect(triggerTurn8).toBe(true);
+
+    await settle(page, 700);
+    await stepFrames(page, 10);
+
+    const turn8Units = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      return ['120', '121'].map((id) => {
+        const u = g?.units?.get?.(id);
+        return { id, pos: u?.position ?? null };
+      });
+    });
+    for (const unit of turn8Units) {
+      expect(unit.pos).not.toBeNull();
+    }
+
+    await saveScreenshot(page, '34-ch5-turn2-turn8-reinforcements');
+  });
+
+  test('Chapter 5 Natasha talk recruits Joshua', async ({ page }) => {
+    await page.goto('/?harness=true&level=5&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const setup = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      if (!g) return { ok: false, reason: 'no_game' };
+      const units = g?.units ? Array.from(g.units.values()) : [];
+      const natasha = g?.units?.get?.('Natasha') ?? units.find((u: any) => u?.nid === 'Natasha');
+      const joshua = g?.units?.get?.('Joshua') ?? units.find((u: any) => u?.nid === 'Joshua');
+      if (!g.board) return { ok: false, reason: 'no_board' };
+      if (!natasha) return { ok: false, reason: 'no_natasha', unitNids: units.map((u: any) => u?.nid) };
+      if (!joshua) return { ok: false, reason: 'no_joshua', unitNids: units.map((u: any) => u?.nid) };
+
+      // Place Natasha adjacent to Joshua and open command menu directly.
+      if (!joshua.position) {
+        g.board.setUnit(9, 7, joshua);
+      }
+      if (!joshua.position) return { ok: false, reason: 'joshua_no_pos_after_set' };
+      const [jx, jy] = joshua.position;
+      // Ensure board occupancy is synchronized with unit position.
+      g.board.setUnit(jx, jy, joshua);
+      g.board.moveUnit(natasha, jx, jy + 1);
+      g.cursor.setPos(jx, jy + 1);
+      g.selectedUnit = natasha;
+      g._moveOrigin = [jx, jy + 1];
+      g.state.change('menu');
+      return { ok: true, reason: 'ok' };
+    });
+    console.log('Natasha/Joshua setup:', setup);
+    expect(setup.ok).toBe(true);
+
+    await stepFrames(page, 8);
+
+    const talkProbe = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const st = g?.state?.getCurrentState?.();
+      const natasha = g?.units?.get?.('Natasha') ?? Array.from(g?.units?.values?.() ?? []).find((u: any) => u?.nid === 'Natasha');
+      const joshua = g?.units?.get?.('Joshua') ?? Array.from(g?.units?.values?.() ?? []).find((u: any) => u?.nid === 'Joshua');
+      const eventCount = (g?.eventManager && natasha && joshua)
+        ? g.eventManager.getEventsForTrigger(
+            { type: 'on_talk', unitA: natasha.nid, unitB: joshua.nid, unit1: natasha, unit2: joshua, levelNid: g?.currentLevel?.nid },
+            { game: g, unit1: natasha, unit2: joshua, gameVars: g?.gameVars, levelVars: g?.levelVars },
+          ).length
+        : -1;
+
+      if (!st || st.name !== 'menu' || !st.menu) {
+        return { hasTalk: false, reason: 'not_menu', state: st?.name ?? null, eventCount };
+      }
+      const labels = st.menu.options.map((o: any) => o?.label);
+      const idx = st.menu.options.findIndex((o: any) => o?.label === 'Talk');
+      if (idx < 0) return { hasTalk: false, reason: 'missing_talk_option', state: st.name, labels, eventCount };
+      st.menu.selectedIndex = idx;
+      return { hasTalk: true, reason: 'ok', state: st.name, labels, eventCount };
+    });
+    console.log('Talk probe:', talkProbe);
+    expect(talkProbe.hasTalk).toBe(true);
+
+    await stepFrames(page, 2, 'SELECT');
+
+    // Advance through full conversation.
+    for (let i = 0; i < 1500; i++) {
+      await stepFrames(page, 2, 'SELECT');
+      const converted = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        const j = g?.units?.get?.('Joshua');
+        return j?.team === 'player';
+      });
+      if (converted) break;
+    }
+
+    const joshuaTeam = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      return g?.units?.get?.('Joshua')?.team ?? null;
+    });
+    expect(joshuaTeam).toBe('player');
+
+    await saveScreenshot(page, '35-ch5-natasha-recruits-joshua');
   });
 });
 

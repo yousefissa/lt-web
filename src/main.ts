@@ -289,23 +289,32 @@ async function main(): Promise<void> {
 
   // --- Determine project URL ---
   const params = new URLSearchParams(window.location.search);
+  const harnessMode = params.get('harness') === 'true';
+  const harnessLevel = params.get('level') ?? 'DEBUG';
+  const harnessClean = params.get('clean') !== 'false'; // default: skip events
   let projectPath = params.get('project');
 
-  // If no project specified, show the picker and redirect with ?project= param
+  // If no project specified:
+  // - Harness mode defaults to default.ltproj for deterministic tests.
+  // - Normal mode shows the project picker and redirects with ?project= param.
   if (!projectPath) {
-    const chosen = await showProjectPicker();
-    const url = new URL(window.location.href);
-    url.searchParams.set('project', chosen);
-    window.location.href = url.toString();
-    return;
+    if (harnessMode) {
+      const projects: string[] = __AVAILABLE_PROJECTS__;
+      const hasDefault = projects.includes('default.ltproj');
+      projectPath = hasDefault ? 'default.ltproj' : (projects[0] ?? 'default.ltproj');
+      console.info(`[Harness] No project specified. Using ${projectPath}`);
+    } else {
+      const chosen = await showProjectPicker();
+      const url = new URL(window.location.href);
+      url.searchParams.set('project', chosen);
+      window.location.href = url.toString();
+      return;
+    }
   }
 
   drawLoadingScreen(ctx, 'Loading...');
   const baseUrl = `/game-data/${projectPath}`;
   const useBundle = params.get('bundle') !== 'false'; // opt-out with ?bundle=false
-  const harnessMode = params.get('harness') === 'true';
-  const harnessLevel = params.get('level') ?? 'DEBUG';
-  const harnessClean = params.get('clean') !== 'false'; // default: skip events
 
   // In harness mode, force zoom so viewport matches GBA resolution (240x160).
   // With tilesAcross=10 and Playwright viewport 480x320:

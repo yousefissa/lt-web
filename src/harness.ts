@@ -159,13 +159,10 @@ export function installHarness(
       game.state.clear();
       game.state.change('free');
 
-      // Step a frame to process the state transition
-      stepOneFrame(null);
-
-      // If there are active events (level_start), push event state
-      if (game.eventManager?.hasActiveEvents()) {
-        game.state.change('event');
-        // Step to process the event state push
+      // Process deferred transitions. FreeState itself will push EventState
+      // when level_start events are queued; avoid manually pushing 'event' here
+      // to prevent duplicate stacked EventState instances.
+      for (let i = 0; i < 3; i++) {
         stepOneFrame(null);
       }
 

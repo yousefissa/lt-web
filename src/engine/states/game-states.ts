@@ -1505,8 +1505,10 @@ export class MenuState extends State {
       // Check if there's a talk event between these two units
       if (game.eventManager) {
         const ctx = { game, unit1: unit, unit2: other, gameVars: game.gameVars, levelVars: game.levelVars };
+        const levelNid = game.currentLevel?.nid ?? '';
         const events = game.eventManager.getEventsForTrigger({
           type: 'on_talk',
+          levelNid,
           unitA: unit.nid,
           unitB: other.nid,
           unit1: unit,
@@ -1643,8 +1645,10 @@ export class MenuState extends State {
           if (other === unit) return false;
           if (game.eventManager) {
             const ctx = { game, unit1: unit, unit2: other, gameVars: game.gameVars, levelVars: game.levelVars };
+            const levelNid = game.currentLevel?.nid ?? '';
             const events = game.eventManager.getEventsForTrigger({
               type: 'on_talk',
+              levelNid,
               unitA: unit.nid,
               unitB: other.nid,
               unit1: unit,
