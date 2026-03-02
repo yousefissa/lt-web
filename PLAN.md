@@ -96,6 +96,16 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 ### Recent Changes
 
+- **Chapter 4 event edge-case sweep (villages, trigger region, snag bridge):**
+  - Added mechanics regressions in `tests/harness.spec.ts` for:
+    - Ch.4 Village2 visit recruits Lute and consumes region
+    - Ch.4 Trigger region spawns `RevenantRein` group on turn-change
+    - Ch.4 Snag death triggers bridge layer reveal (`show_layer;Snag`)
+  - Added screenshots:
+    `49-ch4-village2-recruits-lute.png`,
+    `50-ch4-trigger-revenant-reinforcements.png`,
+    `51-ch4-snag-bridge-layer-revealed.png`.
+  - Full Playwright harness suite now passes: **42/42**.
 - **Chapter 3 outro branch coverage (recruit-dependent transition):**
   - Added mechanics regressions in `tests/harness.spec.ts` for:
     - Ch.3 outro branch with Neimi+Colm alive confirms Colm becomes `player`

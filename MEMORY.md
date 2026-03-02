@@ -28,5 +28,8 @@
   `turncount` before triggering for deterministic behavior.
 - Ch.3 outro validation should assert recruit branch behavior during the outro timeline
   (Colm becomes `player`) rather than after Ch.4 loads, since Ch.4 intro removes many units.
+- Ch.4 Village2 recruitment (`change_team;Lute;player` + `add_unit;...;closest`) can leave Lute
+  unplaced (`position == null`) in some deterministic harness setups; assert team conversion and
+  region consumption as primary correctness checks.
 - Magic sword harness regression should assert deterministic execution signals (state resolution,
   weapon uses decrement) rather than RNG-dependent HP damage.

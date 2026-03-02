@@ -1872,6 +1872,145 @@ test.describe('Sacred Stones Chapter Mechanics', () => {
 
     await saveScreenshot(page, '48-ch3-outro-colm-dead-transition-ok');
   });
+
+  test('Chapter 4 Village2 visit recruits Lute and consumes village region', async ({ page }) => {
+    await page.goto('/?harness=true&level=4&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const setup = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const eirika = g?.units?.get?.('Eirika');
+      if (!g || !g.board || !eirika) return false;
+      eirika.finished = false;
+      eirika.hasMoved = false;
+      eirika.hasAttacked = false;
+      eirika.hasTraded = false;
+      g.board.moveUnit(eirika, 1, 11); // Village2
+      g.cursor.setPos(1, 11);
+      g.selectedUnit = eirika;
+      g._moveOrigin = [1, 11];
+      g.state.change('menu');
+      return true;
+    });
+    expect(setup).toBe(true);
+    await stepFrames(page, 8);
+
+    const selectedVisit = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const st = g?.state?.getCurrentState?.();
+      if (!st || st.name !== 'menu' || !st.menu) return false;
+      const idx = st.menu.options.findIndex((o: any) => o?.label === 'Visit');
+      if (idx < 0) return false;
+      st.menu.selectedIndex = idx;
+      return true;
+    });
+    expect(selectedVisit).toBe(true);
+
+    await stepFrames(page, 2, 'SELECT');
+    for (let i = 0; i < 1500; i++) {
+      await stepFrames(page, 2, 'BACK');
+      const done = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        const lute = g?.units?.get?.('Lute');
+        return lute?.team === 'player' && g?.state?.getCurrentState?.()?.name !== 'event';
+      });
+      if (done) break;
+    }
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const lute = g?.units?.get?.('Lute');
+      const villageStillPresent = (g?.currentLevel?.regions ?? []).some((r: any) => r?.nid === 'Village2');
+      return {
+        luteExists: !!lute,
+        luteTeam: lute?.team ?? null,
+        lutePos: lute?.position ?? null,
+        villageStillPresent,
+      };
+    });
+
+    expect(result.luteExists).toBe(true);
+    expect(result.luteTeam).toBe('player');
+    expect(result.villageStillPresent).toBe(false);
+
+    await saveScreenshot(page, '49-ch4-village2-recruits-lute');
+  });
+
+  test('Chapter 4 trigger region spawns RevenantRein group on turn change', async ({ page }) => {
+    await page.goto('/?harness=true&level=4&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const setup = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const eirika = g?.units?.get?.('Eirika');
+      if (!g || !g.board || !eirika) return false;
+      // Trigger region spans y=9..14, x=0..14.
+      g.board.moveUnit(eirika, 5, 10);
+      return true;
+    });
+    expect(setup).toBe(true);
+
+    const triggered = await page.evaluate(() => {
+      const h = (window as any).__harness;
+      const g = (window as any).__gameRef;
+      if (!h || !g) return false;
+      g.turnCount = 4;
+      (g as any).turncount = 4;
+      return h.triggerEvent('turn_change');
+    });
+    expect(triggered).toBe(true);
+
+    await settle(page, 500);
+    await stepFrames(page, 12);
+
+    const rein = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      return ['118', '119', '120', '121'].map((id) => {
+        const u = g?.units?.get?.(id);
+        return { id, pos: u?.position ?? null };
+      });
+    });
+    for (const u of rein) {
+      expect(u.pos).not.toBeNull();
+    }
+
+    await saveScreenshot(page, '50-ch4-trigger-revenant-reinforcements');
+  });
+
+  test('Chapter 4 Snag death triggers bridge layer reveal', async ({ page }) => {
+    await page.goto('/?harness=true&level=4&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const triggered = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const snag = g?.units?.get?.('Snag');
+      if (!g || !snag) return false;
+
+      snag.currentHp = 0;
+      snag.dead = true;
+      if (snag.position) g.board.removeUnit(snag);
+
+      return g.eventManager?.trigger(
+        { type: 'unit_death', levelNid: g.currentLevel?.nid ?? '', unitNid: 'Snag', unit: snag },
+        { game: g, unit: snag, unit1: snag, position: snag.position, gameVars: g.gameVars, levelVars: g.levelVars },
+      ) ?? false;
+    });
+    expect(triggered).toBe(true);
+
+    await settle(page, 300);
+    await stepFrames(page, 8);
+
+    const snagLayerVisible = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      return !!g?.tilemap?.layers?.find?.((l: any) => l?.nid === 'Snag')?.visible;
+    });
+    expect(snagLayerVisible).toBe(true);
+
+    await saveScreenshot(page, '51-ch4-snag-bridge-layer-revealed');
+  });
 });
 
 // ---------------------------------------------------------------------------
