@@ -18,6 +18,12 @@ npx playwright install chromium
 # Run all visual tests
 npx playwright test
 
+# Run Sacred Stones reliability soak loop (defaults to 5 iterations)
+npm run test:ss:soak
+
+# Custom soak loop size / filter
+SOAK_ITERATIONS=20 SOAK_GREP="Sacred Stones Chapter Mechanics|Level Progression" npm run test:ss:soak
+
 # Run with visible browser (useful for debugging)
 npx playwright test --headed
 
@@ -49,6 +55,16 @@ game loop is **replaced** with a programmatic API exposed on `window.__harness`:
 | `loadLevelClean(nid)` | Load a level, skip all events, go straight to `free` state |
 | `settle(maxFrames)` | Auto-advance through events/menus until reaching `free` state |
 | `giveItem(unitNid, itemNid)` | Give a DB item to a unit (returns `true` on success). Item is inserted at front of inventory so it becomes equipped. |
+
+### Sacred Stones Reliability Soak
+
+`npm run test:ss:soak` runs a repeated Playwright pass over Sacred Stones-heavy
+suites and fails on the first non-deterministic regression.
+
+- Defaults: `SOAK_ITERATIONS=5`, `SOAK_WORKERS=1`
+- Default grep:
+  `Sacred Stones Later Chapters|Sacred Stones Chapter Mechanics|Level Progression`
+- Override with env vars to expand/target specific suites.
 
 ### URL Parameters
 

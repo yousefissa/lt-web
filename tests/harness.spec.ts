@@ -2657,6 +2657,172 @@ test.describe('Sacred Stones Chapter Mechanics', () => {
 
     await saveScreenshot(page, '59-ch5-turn-event-idempotency');
   });
+
+  test('Chapter 2 AI PursueVillage interaction consumes Destructible region and reveals ruins', async ({ page }) => {
+    await page.goto('/?harness=true&level=2&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const setup = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      if (!g || !g.board || !g.phase) return { ok: false, reason: 'missing_game' };
+
+      const target = g.units.get('107') ?? g.units.get('106') ?? g.units.get('103');
+      if (!target) return { ok: false, reason: 'missing_pursue_unit' };
+
+      // Remove player units from the map so PursueVillage chooses Interact
+      // rather than Attack on this forced enemy AI phase.
+      for (const unit of Array.from(g.units.values())) {
+        if (unit.team === 'player' && unit.position) {
+          g.board.removeUnit(unit);
+          unit.position = null;
+        }
+      }
+
+      // Isolate one AI actor and place it directly on the destructible village.
+      for (const unit of Array.from(g.units.values())) {
+        if (unit.team === 'enemy') {
+          unit.finished = true;
+          unit.hasMoved = false;
+          unit.hasAttacked = false;
+          unit.hasTraded = false;
+        }
+      }
+
+      target.finished = false;
+      target.hasMoved = false;
+      target.hasAttacked = false;
+      target.hasTraded = false;
+      g.board.moveUnit(target, 1, 12); // DestroyVillage3
+
+      g.phase.setCurrentTeam('enemy');
+      g.state.change('ai');
+      return { ok: true };
+    });
+    expect(setup.ok).toBe(true);
+
+    let interacted = false;
+    let hitTitle = false;
+    for (let i = 0; i < 1800; i++) {
+      await stepFrames(page, 2, i % 2 === 0 ? 'SELECT' : null);
+
+      const snap = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        const state = g?.state?.getCurrentState?.()?.name ?? null;
+        const regions = g?.currentLevel?.regions ?? [];
+        return {
+          state,
+          hasDestroy: regions.some((r: any) => r?.nid === 'DestroyVillage3'),
+          hasVillage: regions.some((r: any) => r?.nid === 'Village3'),
+          ruinVisible: !!g?.tilemap?.layers?.find?.((l: any) => l?.nid === 'Ruin3')?.visible,
+        };
+      });
+
+      if (snap.state === 'title' || snap.state === 'title_main') {
+        hitTitle = true;
+      }
+
+      if (!snap.hasDestroy && !snap.hasVillage && snap.ruinVisible) {
+        interacted = true;
+        break;
+      }
+    }
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const regions = g?.currentLevel?.regions ?? [];
+      return {
+        state: g?.state?.getCurrentState?.()?.name ?? null,
+        hasDestroy: regions.some((r: any) => r?.nid === 'DestroyVillage3'),
+        hasVillage: regions.some((r: any) => r?.nid === 'Village3'),
+        ruinVisible: !!g?.tilemap?.layers?.find?.((l: any) => l?.nid === 'Ruin3')?.visible,
+      };
+    });
+
+    expect(hitTitle).toBe(false);
+    expect(interacted).toBe(true);
+    expect(result.hasDestroy).toBe(false);
+    expect(result.hasVillage).toBe(false);
+    expect(result.ruinVisible).toBe(true);
+
+    await saveScreenshot(page, '60-ch2-ai-destructible-interact-ruin3');
+  });
+
+  test('Recruit team persistence survives chapter cleanup/reload and appears in prep flow', async ({ page }) => {
+    await page.goto('/?harness=true&level=5&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const setupOk = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const joshua = g?.units?.get?.('Joshua');
+      if (!g || !joshua) return false;
+
+      // Simulate a recruited Joshua before chapter cleanup.
+      joshua.team = 'player';
+      joshua.dead = false;
+      joshua.persistent = true;
+      joshua.party = g.currentParty ?? joshua.party;
+      return true;
+    });
+    expect(setupOk).toBe(true);
+
+    const persisted = await page.evaluate(async () => {
+      const g = (window as any).__gameRef;
+      const h = (window as any).__harness;
+      if (!g || !h) return { ok: false, reason: 'missing_game' };
+
+      // Chapter transition analogue: cleanup + load next chapter.
+      g.cleanUpLevel();
+      await g.loadLevel('5');
+
+      // Keep this deterministic like loadLevelClean.
+      if (g.eventManager) {
+        while (g.eventManager.hasActiveEvents()) {
+          g.eventManager.dequeueCurrentEvent();
+        }
+      }
+      g.state.clear();
+      g.state.change('free');
+      h.stepFrames(3);
+
+      const joshua = g.units.get('Joshua');
+      return {
+        ok: true,
+        team: joshua?.team ?? null,
+        position: joshua?.position ?? null,
+      };
+    });
+    expect(persisted.ok).toBe(true);
+    expect(persisted.team).toBe('player');
+    expect(persisted.position).toEqual([9, 7]);
+
+    const openedPrep = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      if (!g) return false;
+      g.state.change('prep_pick');
+      return true;
+    });
+    expect(openedPrep).toBe(true);
+    await stepFrames(page, 8);
+
+    const prepProbe = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const st = g?.state?.getCurrentState?.();
+      const listedNids = Array.isArray((st as any)?.partyUnits)
+        ? (st as any).partyUnits.map((u: any) => u?.nid)
+        : [];
+      return {
+        state: st?.name ?? null,
+        listedNids,
+      };
+    });
+
+    expect(prepProbe.state).toBe('prep_pick');
+    expect(prepProbe.listedNids).toContain('Joshua');
+
+    await saveScreenshot(page, '61-recruit-persistence-prep-flow-joshua');
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -96,6 +96,24 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 ### Recent Changes
 
+- **AI region interaction + recruit persistence + Sacred Stones soak automation:**
+  - Added two new harness regressions in `tests/harness.spec.ts`:
+    - Ch.2 AI-driven `PursueVillage` `Destructible` interaction (forced enemy AI phase)
+      verifies `DestroyVillage3` + `Village3` region consumption and `Ruin3` layer reveal.
+    - Recruit persistence regression: simulated recruited Joshua survives chapter cleanup/reload
+      with player allegiance intact and appears in `prep_pick` party roster.
+  - Fixed persistent-unit chapter load behavior in `src/engine/game-state.ts` to match Python:
+    persisted units now preserve runtime team/AI allegiance instead of being overwritten by
+    next-level prefab team/AI fields.
+  - Added Sacred Stones reliability soak automation:
+    - New script `scripts/sacred-stones-soak.mjs` loops Playwright Sacred Stones suites
+      (`SOAK_ITERATIONS`, `SOAK_GREP`, `SOAK_WORKERS` configurable, fail-fast on first failure).
+    - Added npm scripts: `test:harness`, `test:ss:soak`.
+    - Documented soak usage in `TESTING.md`.
+  - Added screenshots:
+    `60-ch2-ai-destructible-interact-ruin3.png`,
+    `61-recruit-persistence-prep-flow-joshua.png`.
+
 - **Chapter 4/5 regression matrix sweep (outro branches, villages, arena, ordering, turn idempotency):**
   - Added five harness regressions in `tests/harness.spec.ts` for:
     - Ch.4 outro branch matrix across Artur/Lute permutations (Artur-only, Lute-only, both alive, both dead)
@@ -125,11 +143,11 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
   enemy destructible events vs player visits to ensure one-time semantics and layer toggles are correct.
 - [x] **Chapter 5 turn-event idempotency sweep.** Re-trigger `Turn2/4/8` conditions across long
   frame windows and confirm no duplicate group spawn or stale event-state stacking.
-- [ ] **Enemy AI region interaction regression.** Add harness coverage for AI-driven
+- [x] **Enemy AI region interaction regression.** Add harness coverage for AI-driven
   `Destructible` interactions and validate region removal + event side effects match manual interactions.
-- [ ] **Recruit persistence across chapter transitions.** Add regression tests ensuring recruited
+- [x] **Recruit persistence across chapter transitions.** Add regression tests ensuring recruited
   units remain correctly assigned/serialized through subsequent chapter loads and prep flow.
-- [ ] **Sacred Stones reliability soak run automation.** Add a long-run harness pass that executes
+- [x] **Sacred Stones reliability soak run automation.** Add a long-run harness pass that executes
   multi-chapter mechanics batches repeatedly and fails on non-deterministic state regressions.
 
 - **Chapter 4/5 additional event sweep (Village1, Turn3 cameo, Turn4 brigands):**

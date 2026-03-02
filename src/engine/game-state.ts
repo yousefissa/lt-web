@@ -496,10 +496,9 @@ export class GameState {
             persistedUnit.position = position;
           }
           persistedUnit.startingPosition = position ? [...position] as [number, number] : null;
-          // Update team/ai from level data
-          persistedUnit.team = unitData.team;
-          persistedUnit.ai = unitData.ai;
-          if (unitData.ai_group) persistedUnit.aiGroup = unitData.ai_group;
+          // Preserve runtime team/AI for persistent units (matches Python):
+          // recruits and event-driven allegiance changes should carry across
+          // chapter transitions instead of being overwritten by level prefab data.
           persistedUnit.resetTurnState();
           persistedUnit.finished = false;
           persistedUnit.hasAttacked = false;
