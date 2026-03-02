@@ -931,7 +931,6 @@ test.describe('Sacred Stones Chapter Mechanics', () => {
       g.state.change('menu');
       return { ok: true, reason: 'ok' };
     });
-    console.log('Natasha/Joshua setup:', setup);
     expect(setup.ok).toBe(true);
 
     await stepFrames(page, 8);
@@ -957,7 +956,6 @@ test.describe('Sacred Stones Chapter Mechanics', () => {
       st.menu.selectedIndex = idx;
       return { hasTalk: true, reason: 'ok', state: st.name, labels, eventCount };
     });
-    console.log('Talk probe:', talkProbe);
     expect(talkProbe.hasTalk).toBe(true);
 
     await stepFrames(page, 2, 'SELECT');
@@ -980,6 +978,157 @@ test.describe('Sacred Stones Chapter Mechanics', () => {
     expect(joshuaTeam).toBe('player');
 
     await saveScreenshot(page, '35-ch5-natasha-recruits-joshua');
+  });
+
+  test('Chapter 2 Village1 visit gives Red Gem and consumes region', async ({ page }) => {
+    await page.goto('/?harness=true&level=2&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const setupOk = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const eirika = g?.units?.get?.('Eirika');
+      if (!g || !g.board || !eirika) return false;
+      g.board.moveUnit(eirika, 4, 2); // Village1 tile
+      g.cursor.setPos(4, 2);
+      g.selectedUnit = eirika;
+      g._moveOrigin = [4, 2];
+      g.state.change('menu');
+      return true;
+    });
+    expect(setupOk).toBe(true);
+
+    await stepFrames(page, 8);
+
+    const pickedVisit = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const st = g?.state?.getCurrentState?.();
+      if (!st || st.name !== 'menu' || !st.menu) return false;
+      const idx = st.menu.options.findIndex((o: any) => o?.label === 'Visit');
+      if (idx < 0) return false;
+      st.menu.selectedIndex = idx;
+      return true;
+    });
+    expect(pickedVisit).toBe(true);
+
+    await stepFrames(page, 2, 'SELECT');
+
+    // Enable event skip mode to burn through long village dialogue quickly.
+    for (let i = 0; i < 1200; i++) {
+      await stepFrames(page, 2, 'BACK');
+      const done = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        const eirika = g?.units?.get?.('Eirika');
+        const hasItem = (eirika?.items ?? []).some((it: any) => it?.nid === 'Red_Gem');
+        return hasItem || g?.state?.getCurrentState?.()?.name === 'free';
+      });
+      if (done) break;
+    }
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const eirika = g?.units?.get?.('Eirika');
+      const itemNids = (eirika?.items ?? []).map((it: any) => it?.nid);
+      const villageStillPresent = (g?.currentLevel?.regions ?? []).some((r: any) => r?.nid === 'Village1');
+      return { itemNids, villageStillPresent, state: g?.state?.getCurrentState?.()?.name ?? null };
+    });
+    expect(result.itemNids).toContain('Red_Gem');
+    expect(result.villageStillPresent).toBe(false);
+
+    await saveScreenshot(page, '36-ch2-village1-visited-red-gem');
+  });
+
+  test('Chapter 5 Village2 visit gives Armorslayer and consumes region', async ({ page }) => {
+    await page.goto('/?harness=true&level=5&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const setupOk = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const eirika = g?.units?.get?.('Eirika');
+      if (!g || !g.board || !eirika) return false;
+      g.board.moveUnit(eirika, 12, 10); // Village2 tile
+      g.cursor.setPos(12, 10);
+      g.selectedUnit = eirika;
+      g._moveOrigin = [12, 10];
+      g.state.change('menu');
+      return true;
+    });
+    expect(setupOk).toBe(true);
+
+    await stepFrames(page, 8);
+
+    const pickedVisit = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const st = g?.state?.getCurrentState?.();
+      if (!st || st.name !== 'menu' || !st.menu) return false;
+      const idx = st.menu.options.findIndex((o: any) => o?.label === 'Visit');
+      if (idx < 0) return false;
+      st.menu.selectedIndex = idx;
+      return true;
+    });
+    expect(pickedVisit).toBe(true);
+
+    await stepFrames(page, 2, 'SELECT');
+
+    for (let i = 0; i < 1200; i++) {
+      await stepFrames(page, 2, 'BACK');
+      const done = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        const eirika = g?.units?.get?.('Eirika');
+        const hasItem = (eirika?.items ?? []).some((it: any) => it?.nid === 'Armorslayer');
+        return hasItem || g?.state?.getCurrentState?.()?.name === 'free';
+      });
+      if (done) break;
+    }
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const eirika = g?.units?.get?.('Eirika');
+      const itemNids = (eirika?.items ?? []).map((it: any) => it?.nid);
+      const villageStillPresent = (g?.currentLevel?.regions ?? []).some((r: any) => r?.nid === 'Village2');
+      return { itemNids, villageStillPresent, state: g?.state?.getCurrentState?.()?.name ?? null };
+    });
+    expect(result.itemNids).toContain('Armorslayer');
+    expect(result.villageStillPresent).toBe(false);
+
+    await saveScreenshot(page, '37-ch5-village2-visited-armorslayer');
+  });
+
+  test('Chapter 5 Vendor and Armory region options appear in menu', async ({ page }) => {
+    await page.goto('/?harness=true&level=5&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const probeRegion = async (x: number, y: number, expectedLabel: string) => {
+      const setup = await page.evaluate(({ x, y }: { x: number; y: number }) => {
+        const g = (window as any).__gameRef;
+        const eirika = g?.units?.get?.('Eirika');
+        if (!g || !g.board || !eirika) return false;
+        g.board.moveUnit(eirika, x, y);
+        g.cursor.setPos(x, y);
+        g.selectedUnit = eirika;
+        g._moveOrigin = [x, y];
+        g.state.change('menu');
+        return true;
+      }, { x, y });
+      expect(setup).toBe(true);
+      await stepFrames(page, 8);
+      const hasLabel = await page.evaluate((expectedLabel: string) => {
+        const g = (window as any).__gameRef;
+        const st = g?.state?.getCurrentState?.();
+        if (!st || st.name !== 'menu' || !st.menu) return false;
+        return st.menu.options.some((o: any) => o?.label === expectedLabel);
+      }, expectedLabel);
+      expect(hasLabel).toBe(true);
+      await stepFrames(page, 2, 'BACK');
+      await stepFrames(page, 2, 'BACK');
+    };
+
+    await probeRegion(6, 10, 'Vendor');
+    await probeRegion(2, 1, 'Armory');
+
+    await saveScreenshot(page, '38-ch5-vendor-armory-menu-options');
   });
 });
 

@@ -12,5 +12,7 @@
 - Talk menu discovery for level-scoped conversations must pass `levelNid` into
   `eventManager.getEventsForTrigger()`. Missing `levelNid` hides valid Talk options even when
   matching events exist (reproduced with Ch.5 Natasha/Joshua recruitment).
+- For long village cutscenes in harness tests, use `BACK` input to enable EventState skip mode;
+  relying on repeated `SELECT` can leave tests mid-event and make item assertions flaky.
 - Magic sword harness regression should assert deterministic execution signals (state resolution,
   weapon uses decrement) rather than RNG-dependent HP damage.

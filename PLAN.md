@@ -88,6 +88,17 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 ### Recent Changes
 
+- **Chapter interaction coverage expansion (villages + shops):**
+  - Added chapter mechanics regressions in `tests/harness.spec.ts` for:
+    - Ch.2 Village1 Visit grants `Red_Gem` and consumes region
+    - Ch.5 Village2 Visit grants `Armorslayer` and consumes region
+    - Ch.5 Vendor and Armory region menu options appear on correct tiles
+  - Added screenshots:
+    `36-ch2-village1-visited-red-gem.png`,
+    `37-ch5-village2-visited-armorslayer.png`,
+    `38-ch5-vendor-armory-menu-options.png`.
+  - Sacred Stones chapter suites (`Later Chapters` + `Chapter Mechanics`) now
+    pass **15/15**.
 - **Deeper Sacred Stones chapter sweep (Ch.2–Ch.5 mechanics):**
   - Added chapter mechanics tests in `tests/harness.spec.ts`:
     - Ch.3 seize objective transitions to Ch.4
