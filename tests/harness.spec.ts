@@ -1591,6 +1591,128 @@ test.describe('Sacred Stones Chapter Mechanics', () => {
 
     await saveScreenshot(page, '44-ch5-destructible-villages-ruins');
   });
+
+  test('Chapter 3 turn event spawns Colm and moves him to chest room', async ({ page }) => {
+    await page.goto('/?harness=true&level=3&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const triggered = await page.evaluate(() => {
+      const h = (window as any).__harness;
+      const g = (window as any).__gameRef;
+      if (!h || !g) return false;
+      g.turnCount = 1;
+      (g as any).turncount = 1;
+      return h.triggerEvent('other_turn_change');
+    });
+    expect(triggered).toBe(true);
+
+    // Skip through Colm dialogue quickly.
+    for (let i = 0; i < 1200; i++) {
+      await stepFrames(page, 2, 'BACK');
+      const done = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        const colm = g?.units?.get?.('Colm');
+        return !!colm?.position && g?.state?.getCurrentState?.()?.name !== 'event';
+      });
+      if (done) break;
+    }
+
+    const colmState = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const colm = g?.units?.get?.('Colm');
+      return {
+        exists: !!colm,
+        team: colm?.team ?? null,
+        pos: colm?.position ?? null,
+      };
+    });
+
+    expect(colmState.exists).toBe(true);
+    expect(colmState.team).toBe('other');
+    expect(colmState.pos).toEqual([2, 4]);
+
+    await saveScreenshot(page, '45-ch3-colm-turn-event-spawn');
+  });
+
+  test('Chapter 3 Neimi talk recruits Colm after turn event', async ({ page }) => {
+    await page.goto('/?harness=true&level=3&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const spawned = await page.evaluate(() => {
+      const h = (window as any).__harness;
+      const g = (window as any).__gameRef;
+      if (!h || !g) return false;
+      g.turnCount = 1;
+      (g as any).turncount = 1;
+      return h.triggerEvent('other_turn_change');
+    });
+    expect(spawned).toBe(true);
+
+    for (let i = 0; i < 1200; i++) {
+      await stepFrames(page, 2, 'BACK');
+      const done = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        const colm = g?.units?.get?.('Colm');
+        return !!colm?.position && g?.state?.getCurrentState?.()?.name !== 'event';
+      });
+      if (done) break;
+    }
+
+    const setupOk = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const neimi = g?.units?.get?.('Neimi');
+      const colm = g?.units?.get?.('Colm');
+      if (!g || !g.board || !neimi || !colm || !colm.position) return false;
+
+      neimi.finished = false;
+      neimi.hasMoved = false;
+      neimi.hasAttacked = false;
+      neimi.hasTraded = false;
+
+      const [cx, cy] = colm.position;
+      g.board.moveUnit(neimi, cx, cy + 1);
+      g.cursor.setPos(cx, cy + 1);
+      g.selectedUnit = neimi;
+      g._moveOrigin = [cx, cy + 1];
+      g.state.change('menu');
+      return true;
+    });
+    expect(setupOk).toBe(true);
+
+    await stepFrames(page, 8);
+
+    const hasTalk = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const st = g?.state?.getCurrentState?.();
+      if (!st || st.name !== 'menu' || !st.menu) return false;
+      const idx = st.menu.options.findIndex((o: any) => o?.label === 'Talk');
+      if (idx < 0) return false;
+      st.menu.selectedIndex = idx;
+      return true;
+    });
+    expect(hasTalk).toBe(true);
+
+    await stepFrames(page, 2, 'SELECT');
+
+    for (let i = 0; i < 1500; i++) {
+      await stepFrames(page, 2, 'SELECT');
+      const recruited = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        return g?.units?.get?.('Colm')?.team === 'player';
+      });
+      if (recruited) break;
+    }
+
+    const colmTeam = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      return g?.units?.get?.('Colm')?.team ?? null;
+    });
+    expect(colmTeam).toBe('player');
+
+    await saveScreenshot(page, '46-ch3-neimi-recruits-colm');
+  });
 });
 
 // ---------------------------------------------------------------------------

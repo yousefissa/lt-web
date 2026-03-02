@@ -96,6 +96,14 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 ### Recent Changes
 
+- **Chapter 3 Colm flow coverage (spawn + recruitment):**
+  - Added mechanics regressions in `tests/harness.spec.ts` for:
+    - Ch.3 `other_turn_change` event spawns Colm and moves him to chest room
+    - Ch.3 Neimi->Colm talk recruits Colm to player team
+  - Added screenshots:
+    `45-ch3-colm-turn-event-spawn.png`,
+    `46-ch3-neimi-recruits-colm.png`.
+  - Full Playwright harness suite now passes: **37/37**.
 - **Destructible village sweep (Ch.2 + Ch.5) + trigger compatibility fix:**
   - Added mechanics regressions in `tests/harness.spec.ts` for:
     - Ch.2 `DestroyVillage1/2/3` -> `Ruin1/2/3` layer visibility + region removal

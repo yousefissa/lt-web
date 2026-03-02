@@ -23,5 +23,8 @@
 - Destructible village data may be mixed between `DestroyVillageX` interaction regions and
   event conditions that match `VillageX`. Region-trigger code should retry with sibling region
   context when `Destructible` trigger fails on `Destroy*` region.
+- Ch.3 Colm spawn event (`3_Turn2`) uses trigger `other_turn_change` with condition
+  `game.turncount == 1` in this data set; harness tests should set both `turnCount` and
+  `turncount` before triggering for deterministic behavior.
 - Magic sword harness regression should assert deterministic execution signals (state resolution,
   weapon uses decrement) rather than RNG-dependent HP damage.
