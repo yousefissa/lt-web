@@ -38,6 +38,10 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 ### Known Bugs
 
+- [x] **Some Ch.5 destructible village events failed to fire from `DestroyVillageX` regions.** *(Fixed)*
+  Event conditions in default data can target sibling `VillageX` NIDs while the
+  interaction region is `DestroyVillageX`. Added compatibility fallback for
+  Destructible triggers to retry with sibling region context when needed.
 - [x] **Chest/Door region checks could crash in menu state (`comps.some is not a function`).** *(Fixed)*
   `evaluateCondition(unit.can_unlock(region))` assumed item components were array-shaped,
   but runtime `ItemObject.components` is a `Map`. Added robust `Map`/array/object handling,
@@ -92,6 +96,17 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 ### Recent Changes
 
+- **Destructible village sweep (Ch.2 + Ch.5) + trigger compatibility fix:**
+  - Added mechanics regressions in `tests/harness.spec.ts` for:
+    - Ch.2 `DestroyVillage1/2/3` -> `Ruin1/2/3` layer visibility + region removal
+    - Ch.5 destructible village interactions (`DestroyVillage2/4`) -> `Ruin2/4`
+  - Fixed region-trigger compatibility in `src/engine/states/game-states.ts`
+    (menu and AI interaction paths): when `Destructible` trigger from
+    `DestroyX` has no matching event, retry using sibling `X` region context.
+  - Added screenshots:
+    `43-ch2-destructible-villages-ruins.png`,
+    `44-ch5-destructible-villages-ruins.png`.
+  - Full Playwright harness suite now passes: **35/35**.
 - **Chapter 3 full lock interaction sweep (all chest/door variants):**
   - Added mechanics regressions in `tests/harness.spec.ts` for:
     - All remaining Ch.3 chests (`Chest2/3/4`) unlock + loot checks

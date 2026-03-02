@@ -1609,6 +1609,31 @@ export class MenuState extends State {
               ctx,
             );
           }
+
+          // Compatibility fallback for destructible village events where LT data
+          // conditions target the sibling "VillageX" region while interaction
+          // originates from "DestroyVillageX".
+          if (!didTrigger && subNid === 'Destructible' && region?.nid?.startsWith('Destroy') && game.currentLevel?.regions) {
+            const aliasNid = region.nid.replace(/^Destroy/, '');
+            const aliasRegion = game.currentLevel.regions.find(
+              (r) => r.nid === aliasNid,
+            );
+            if (aliasRegion) {
+              const aliasCtx = {
+                game,
+                unit1: unit,
+                position: unit.position,
+                region: aliasRegion,
+                gameVars: game.gameVars,
+                levelVars: game.levelVars,
+              };
+              didTrigger = game.eventManager.trigger(
+                { type: subNid, levelNid, regionNid: aliasRegion.nid, unitNid: unit.nid, unit1: unit, region: aliasRegion },
+                aliasCtx,
+              );
+            }
+          }
+
           // Fallback to generic on_region_interact
           if (!didTrigger) {
             didTrigger = game.eventManager.trigger(
@@ -4267,6 +4292,28 @@ export class AIState extends MapState {
                 { type: region.sub_nid, unit1: unit, position: action.targetPosition, region, levelNid: game.currentLevel?.nid },
                 ctx,
               );
+
+              // Compatibility fallback for destructible village events that
+              // reference sibling "VillageX" region NIDs.
+              if (!triggered && region.sub_nid === 'Destructible' && region.nid?.startsWith('Destroy')) {
+                const aliasNid = region.nid.replace(/^Destroy/, '');
+                const aliasRegion = regions.find((r: any) => r.nid === aliasNid);
+                if (aliasRegion) {
+                  const aliasCtx = {
+                    game,
+                    unit1: unit,
+                    position: action.targetPosition,
+                    region: aliasRegion,
+                    gameVars: game.gameVars,
+                    levelVars: game.levelVars,
+                  };
+                  triggered = game.eventManager.trigger(
+                    { type: aliasRegion.sub_nid ?? region.sub_nid, unit1: unit, position: action.targetPosition, region: aliasRegion, levelNid: game.currentLevel?.nid },
+                    aliasCtx,
+                  );
+                }
+              }
+
               // Fallback to generic on_region_interact
               if (!triggered) {
                 triggered = game.eventManager.trigger(

@@ -1464,6 +1464,133 @@ test.describe('Sacred Stones Chapter Mechanics', () => {
 
     await saveScreenshot(page, '42-ch3-door2-door3-unlocked');
   });
+
+  test('Chapter 2 destructible village regions trigger ruin layers', async ({ page }) => {
+    await page.goto('/?harness=true&level=2&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const villages = [
+      { region: 'DestroyVillage1', x: 4, y: 2, ruin: 'Ruin1' },
+      { region: 'DestroyVillage2', x: 7, y: 2, ruin: 'Ruin2' },
+      { region: 'DestroyVillage3', x: 1, y: 12, ruin: 'Ruin3' },
+    ];
+
+    for (const v of villages) {
+      await page.evaluate(async () => {
+        await (window as any).__harness.loadLevelClean('2');
+      });
+      await stepFrames(page, 6);
+
+      const setup = await page.evaluate(({ x, y }: { x: number; y: number }) => {
+        const g = (window as any).__gameRef;
+        const eirika = g?.units?.get?.('Eirika');
+        if (!g || !g.board || !eirika) return false;
+        eirika.team = 'enemy';
+        eirika.finished = false;
+        eirika.hasMoved = false;
+        eirika.hasAttacked = false;
+        eirika.hasTraded = false;
+        g.board.moveUnit(eirika, x, y);
+        g.cursor.setPos(x, y);
+        g.selectedUnit = eirika;
+        g._moveOrigin = [x, y];
+        g.state.change('menu');
+        return true;
+      }, { x: v.x, y: v.y });
+      expect(setup).toBe(true);
+      await stepFrames(page, 8);
+
+      const selectedDestructible = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        const st = g?.state?.getCurrentState?.();
+        if (!st || st.name !== 'menu' || !st.menu) return false;
+        const idx = st.menu.options.findIndex((o: any) => o?.label === 'Destructible');
+        if (idx < 0) return false;
+        st.menu.selectedIndex = idx;
+        return true;
+      });
+      expect(selectedDestructible).toBe(true);
+
+      await stepFrames(page, 2, 'SELECT');
+      await settle(page, 300);
+
+      const result = await page.evaluate(({ regionNid, ruinLayer }: { regionNid: string; ruinLayer: string }) => {
+        const g = (window as any).__gameRef;
+        const regionStillPresent = (g?.currentLevel?.regions ?? []).some((r: any) => r?.nid === regionNid);
+        const ruinVisible = !!g?.tilemap?.layers?.find?.((l: any) => l?.nid === ruinLayer)?.visible;
+        return { regionStillPresent, ruinVisible };
+      }, { regionNid: v.region, ruinLayer: v.ruin });
+
+      expect(result.regionStillPresent).toBe(false);
+      expect(result.ruinVisible).toBe(true);
+    }
+
+    await saveScreenshot(page, '43-ch2-destructible-villages-ruins');
+  });
+
+  test('Chapter 5 destructible village interactions trigger ruin layers', async ({ page }) => {
+    await page.goto('/?harness=true&level=5&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const villages = [
+      { region: 'DestroyVillage2', x: 12, y: 10, ruin: 'Ruin2' },
+      { region: 'DestroyVillage4', x: 5, y: 1, ruin: 'Ruin4' },
+    ];
+
+    for (const v of villages) {
+      await page.evaluate(async () => {
+        await (window as any).__harness.loadLevelClean('5');
+      });
+      await stepFrames(page, 6);
+
+      const setup = await page.evaluate(({ x, y }: { x: number; y: number }) => {
+        const g = (window as any).__gameRef;
+        const eirika = g?.units?.get?.('Eirika');
+        if (!g || !g.board || !eirika) return false;
+        eirika.team = 'enemy';
+        eirika.finished = false;
+        eirika.hasMoved = false;
+        eirika.hasAttacked = false;
+        eirika.hasTraded = false;
+        g.board.moveUnit(eirika, x, y);
+        g.cursor.setPos(x, y);
+        g.selectedUnit = eirika;
+        g._moveOrigin = [x, y];
+        g.state.change('menu');
+        return true;
+      }, { x: v.x, y: v.y });
+      expect(setup).toBe(true);
+      await stepFrames(page, 8);
+
+      const selectedDestructible = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        const st = g?.state?.getCurrentState?.();
+        if (!st || st.name !== 'menu' || !st.menu) return false;
+        const idx = st.menu.options.findIndex((o: any) => o?.label === 'Destructible');
+        if (idx < 0) return false;
+        st.menu.selectedIndex = idx;
+        return true;
+      });
+      expect(selectedDestructible).toBe(true);
+
+      await stepFrames(page, 2, 'SELECT');
+      await settle(page, 300);
+
+      const result = await page.evaluate(({ regionNid, ruinLayer }: { regionNid: string; ruinLayer: string }) => {
+        const g = (window as any).__gameRef;
+        const regionStillPresent = (g?.currentLevel?.regions ?? []).some((r: any) => r?.nid === regionNid);
+        const ruinVisible = !!g?.tilemap?.layers?.find?.((l: any) => l?.nid === ruinLayer)?.visible;
+        return { regionStillPresent, ruinVisible };
+      }, { regionNid: v.region, ruinLayer: v.ruin });
+
+      expect(result.regionStillPresent).toBe(false);
+      expect(result.ruinVisible).toBe(true);
+    }
+
+    await saveScreenshot(page, '44-ch5-destructible-villages-ruins');
+  });
 });
 
 // ---------------------------------------------------------------------------

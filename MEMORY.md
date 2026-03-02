@@ -20,5 +20,8 @@
 - In multi-step interaction tests, prior actions can leave units with `finished=true`; either reset
   per-turn flags explicitly or reload the level cleanly between cases to avoid false negatives when
   forcing `menu` state.
+- Destructible village data may be mixed between `DestroyVillageX` interaction regions and
+  event conditions that match `VillageX`. Region-trigger code should retry with sibling region
+  context when `Destructible` trigger fails on `Destroy*` region.
 - Magic sword harness regression should assert deterministic execution signals (state resolution,
   weapon uses decrement) rather than RNG-dependent HP damage.
