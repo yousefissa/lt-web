@@ -96,6 +96,42 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 ### Recent Changes
 
+- **Chapter 4/5 regression matrix sweep (outro branches, villages, arena, ordering, turn idempotency):**
+  - Added five harness regressions in `tests/harness.spec.ts` for:
+    - Ch.4 outro branch matrix across Artur/Lute permutations (Artur-only, Lute-only, both alive, both dead)
+    - Ch.5 `Village1/3/4` visit reward matrix with one-time reward + region-consumption checks
+    - Ch.5 arena interaction flow (menu option, event progression, return-to-map control)
+    - Ch.5 visit-vs-destroy ordering semantics (one-time region consumption in both directions)
+    - Ch.5 turn-event idempotency for `Turn2/4/8` over repeated long-window retriggers
+  - Updated region cleanup semantics in `src/engine/states/game-states.ts` so triggering one
+    side of village Visit/Destructible siblings consumes both matching one-time regions on the same tile.
+  - Added screenshots:
+    `55-ch4-outro-branch-matrix.png`,
+    `56-ch5-village134-visit-matrix.png`,
+    `57-ch5-arena-flow-return.png`,
+    `58-ch5-village-ordering-visit-vs-destroy.png`,
+    `59-ch5-turn-event-idempotency.png`.
+  - Focused Playwright pass for these five new regressions: **5/5**. Build also passes (`npm run build`).
+
+### Ralph Loop Backlog (Autonomous)
+
+- [x] **Chapter 4 outro branch matrix regression coverage.** Add tests for Artur-only, Lute-only,
+  both alive, and both dead paths; verify dialogue/event progression and clean transition behavior.
+- [x] **Chapter 5 village visit matrix regression coverage.** Add deterministic tests for
+  `Village1/3/4` rewards and region consumption; verify no duplicate rewards on re-interact attempts.
+- [x] **Chapter 5 arena interaction flow coverage.** Validate arena menu availability,
+  interaction state flow, and safe return to map control without soft-lock.
+- [x] **Chapter 5 village destroy-vs-visit ordering checks.** Add race-condition tests for
+  enemy destructible events vs player visits to ensure one-time semantics and layer toggles are correct.
+- [x] **Chapter 5 turn-event idempotency sweep.** Re-trigger `Turn2/4/8` conditions across long
+  frame windows and confirm no duplicate group spawn or stale event-state stacking.
+- [ ] **Enemy AI region interaction regression.** Add harness coverage for AI-driven
+  `Destructible` interactions and validate region removal + event side effects match manual interactions.
+- [ ] **Recruit persistence across chapter transitions.** Add regression tests ensuring recruited
+  units remain correctly assigned/serialized through subsequent chapter loads and prep flow.
+- [ ] **Sacred Stones reliability soak run automation.** Add a long-run harness pass that executes
+  multi-chapter mechanics batches repeatedly and fails on non-deterministic state regressions.
+
 - **Chapter 4/5 additional event sweep (Village1, Turn3 cameo, Turn4 brigands):**
   - Added mechanics regressions in `tests/harness.spec.ts` for:
     - Ch.4 Village1 visit grants `Iron_Axe` and consumes region

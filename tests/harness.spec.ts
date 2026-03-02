@@ -2146,6 +2146,517 @@ test.describe('Sacred Stones Chapter Mechanics', () => {
 
     await saveScreenshot(page, '54-ch5-turn4-brigand2-spawn');
   });
+
+  test('Chapter 4 outro branch matrix transitions cleanly for Artur/Lute permutations', async ({ page }) => {
+    test.setTimeout(120_000);
+
+    await page.goto('/?harness=true&level=4&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const outroCases = [
+      { label: 'artur-only', arturAlive: true, luteAlive: false, expectArtur: true, expectLute: false },
+      { label: 'lute-only', arturAlive: false, luteAlive: true, expectArtur: false, expectLute: true },
+      { label: 'both-alive', arturAlive: true, luteAlive: true, expectArtur: true, expectLute: true },
+      { label: 'both-dead', arturAlive: false, luteAlive: false, expectArtur: false, expectLute: false },
+    ];
+
+    for (const outroCase of outroCases) {
+      await page.evaluate(async () => {
+        await (window as any).__harness.loadLevelClean('4');
+      });
+      await stepFrames(page, 8);
+
+      const setup = await page.evaluate(({ arturAlive, luteAlive }) => {
+        const g = (window as any).__gameRef;
+        const artur = g?.units?.get?.('Artur');
+        const lute = g?.units?.get?.('Lute');
+        if (!g || !g.board || !artur || !lute) return { ok: false, reason: 'missing_units' };
+
+        const setAlive = (u: any, alive: boolean) => {
+          u.dead = !alive;
+          u.currentHp = alive ? Math.max(1, u.currentHp ?? 1) : 0;
+          if (!alive && u.position) {
+            g.board.removeUnit(u);
+          }
+        };
+
+        setAlive(artur, arturAlive);
+        setAlive(lute, luteAlive);
+
+        for (const unit of Array.from(g.units.values())) {
+          if (unit?.team === 'enemy' && !unit.isDead?.()) {
+            unit.dead = true;
+            unit.currentHp = 0;
+            if (unit.position) g.board.removeUnit(unit);
+          }
+        }
+
+        return { ok: true };
+      }, { arturAlive: outroCase.arturAlive, luteAlive: outroCase.luteAlive });
+      expect(setup.ok).toBe(true);
+
+      const triggered = await page.evaluate(() => {
+        const h = (window as any).__harness;
+        return h?.triggerEvent?.('combat_end') ?? false;
+      });
+      expect(triggered).toBe(true);
+
+      await stepFrames(page, 3);
+
+      let maxCommandPointer = -1;
+      let hitTitle = false;
+      let transitioned = false;
+
+      for (let i = 0; i < 2400; i++) {
+        await stepFrames(page, 2, 'BACK');
+        const snap = await page.evaluate(() => {
+          const g = (window as any).__gameRef;
+          const state = g?.state?.getCurrentState?.()?.name ?? null;
+          const event = g?.eventManager?.getCurrentEvent?.();
+          const commandPointer = typeof event?.commandPointer === 'number' ? event.commandPointer : null;
+          return {
+            levelNid: g?.currentLevel?.nid ?? null,
+            state,
+            commandPointer,
+          };
+        });
+
+        if (snap.commandPointer != null && snap.commandPointer > maxCommandPointer) {
+          maxCommandPointer = snap.commandPointer;
+        }
+        if (snap.state === 'title' || snap.state === 'title_main') hitTitle = true;
+        if (snap.levelNid === '5') {
+          transitioned = true;
+          break;
+        }
+      }
+
+      expect(hitTitle).toBe(false);
+      expect(maxCommandPointer).toBeGreaterThan(30);
+      expect(transitioned || maxCommandPointer > 80).toBe(true);
+    }
+
+    await saveScreenshot(page, '55-ch4-outro-branch-matrix');
+  });
+
+  test('Chapter 5 Village1/3/4 visits grant one-time rewards and consume regions', async ({ page }) => {
+    await page.goto('/?harness=true&level=5&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const villages = [
+      { nid: 'Village1', x: 12, y: 19, reward: 'Dragonshield' },
+      { nid: 'Village3', x: 5, y: 6, reward: 'Secret_Book' },
+      { nid: 'Village4', x: 5, y: 1, reward: 'Torch' },
+    ];
+
+    for (const village of villages) {
+      await page.evaluate(async () => {
+        await (window as any).__harness.loadLevelClean('5');
+      });
+      await stepFrames(page, 8);
+
+      const beforeCount = await page.evaluate((reward: string) => {
+        const g = (window as any).__gameRef;
+        const eirika = g?.units?.get?.('Eirika');
+        return (eirika?.items ?? []).filter((it: any) => it?.nid === reward).length;
+      }, village.reward);
+
+      const setup = await page.evaluate(({ x, y }) => {
+        const g = (window as any).__gameRef;
+        const eirika = g?.units?.get?.('Eirika');
+        if (!g || !g.board || !eirika) return false;
+        eirika.team = 'player';
+        eirika.finished = false;
+        eirika.hasMoved = false;
+        eirika.hasAttacked = false;
+        eirika.hasTraded = false;
+        g.board.moveUnit(eirika, x, y);
+        g.cursor.setPos(x, y);
+        g.selectedUnit = eirika;
+        g._moveOrigin = [x, y];
+        g.state.change('menu');
+        return true;
+      }, { x: village.x, y: village.y });
+      expect(setup).toBe(true);
+      await stepFrames(page, 8);
+
+      const pickedVisit = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        const st = g?.state?.getCurrentState?.();
+        if (!st || st.name !== 'menu' || !st.menu) return false;
+        const idx = st.menu.options.findIndex((o: any) => o?.label === 'Visit');
+        if (idx < 0) return false;
+        st.menu.selectedIndex = idx;
+        return true;
+      });
+      expect(pickedVisit).toBe(true);
+
+      await stepFrames(page, 2, 'SELECT');
+      for (let i = 0; i < 1600; i++) {
+        await stepFrames(page, 2, 'BACK');
+        const done = await page.evaluate(() => {
+          const g = (window as any).__gameRef;
+          return g?.state?.getCurrentState?.()?.name !== 'event';
+        });
+        if (done) break;
+      }
+
+      const afterVisit = await page.evaluate(({ nid, reward }: { nid: string; reward: string }) => {
+        const g = (window as any).__gameRef;
+        const eirika = g?.units?.get?.('Eirika');
+        const rewardCount = (eirika?.items ?? []).filter((it: any) => it?.nid === reward).length;
+        const regions = g?.currentLevel?.regions ?? [];
+        return {
+          rewardCount,
+          villagePresent: regions.some((r: any) => r?.nid === nid),
+          destroyPresent: regions.some((r: any) => r?.nid === `Destroy${nid}`),
+        };
+      }, { nid: village.nid, reward: village.reward });
+
+      expect(afterVisit.rewardCount).toBe(beforeCount + 1);
+      expect(afterVisit.villagePresent).toBe(false);
+      expect(afterVisit.destroyPresent).toBe(false);
+
+      const retrySetup = await page.evaluate(({ x, y }) => {
+        const g = (window as any).__gameRef;
+        const eirika = g?.units?.get?.('Eirika');
+        if (!g || !g.board || !eirika) return false;
+        eirika.finished = false;
+        eirika.hasMoved = false;
+        eirika.hasAttacked = false;
+        eirika.hasTraded = false;
+        g.board.moveUnit(eirika, x, y);
+        g.cursor.setPos(x, y);
+        g.selectedUnit = eirika;
+        g._moveOrigin = [x, y];
+        g.state.change('menu');
+        return true;
+      }, { x: village.x, y: village.y });
+      expect(retrySetup).toBe(true);
+      await stepFrames(page, 8);
+
+      const retryProbe = await page.evaluate((reward: string) => {
+        const g = (window as any).__gameRef;
+        const eirika = g?.units?.get?.('Eirika');
+        const st = g?.state?.getCurrentState?.();
+        const labels = st?.menu?.options?.map((o: any) => o?.label) ?? [];
+        const rewardCount = (eirika?.items ?? []).filter((it: any) => it?.nid === reward).length;
+        return {
+          inMenu: st?.name === 'menu',
+          labels,
+          rewardCount,
+        };
+      }, village.reward);
+
+      expect(retryProbe.inMenu).toBe(true);
+      expect(retryProbe.labels).not.toContain('Visit');
+      expect(retryProbe.rewardCount).toBe(afterVisit.rewardCount);
+    }
+
+    await saveScreenshot(page, '56-ch5-village134-visit-matrix');
+  });
+
+  test('Chapter 5 arena interaction enters event/combat and returns to map control', async ({ page }) => {
+    await page.goto('/?harness=true&level=5&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const setup = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const eirika = g?.units?.get?.('Eirika');
+      if (!g || !g.board || !eirika) return false;
+      eirika.finished = false;
+      eirika.hasMoved = false;
+      eirika.hasAttacked = false;
+      eirika.hasTraded = false;
+      g.board.moveUnit(eirika, 12, 6);
+      g.cursor.setPos(12, 6);
+      g.selectedUnit = eirika;
+      g._moveOrigin = [12, 6];
+      g.state.change('menu');
+      return true;
+    });
+    expect(setup).toBe(true);
+    await stepFrames(page, 8);
+
+    const pickedArena = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const st = g?.state?.getCurrentState?.();
+      if (!st || st.name !== 'menu' || !st.menu) return false;
+      const idx = st.menu.options.findIndex((o: any) => o?.label === 'Arena');
+      if (idx < 0) return false;
+      st.menu.selectedIndex = idx;
+      return true;
+    });
+    expect(pickedArena).toBe(true);
+
+    await stepFrames(page, 2, 'SELECT');
+
+    let sawArenaEvent = false;
+    let hitTitle = false;
+    let recoveredFree = false;
+
+    for (let i = 0; i < 3600; i++) {
+      await stepFrames(page, 2, 'SELECT');
+      const snap = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        const state = g?.state?.getCurrentState?.()?.name ?? null;
+        const eventNid = g?.eventManager?.getCurrentEvent?.()?.nid ?? null;
+        return {
+          levelNid: g?.currentLevel?.nid ?? null,
+          state,
+          eventNid,
+        };
+      });
+
+      if (snap.eventNid === '5 Arena') sawArenaEvent = true;
+      if (snap.state === 'title' || snap.state === 'title_main') hitTitle = true;
+      if (sawArenaEvent && snap.state === 'free' && snap.levelNid === '5') {
+        recoveredFree = true;
+        break;
+      }
+    }
+
+    expect(sawArenaEvent).toBe(true);
+    expect(hitTitle).toBe(false);
+    expect(recoveredFree).toBe(true);
+
+    const cursorMoved = await page.evaluate(() => {
+      const h = (window as any).__harness;
+      const before = h?.getState?.()?.cursorPos ?? null;
+      if (!before) return false;
+      h.stepFrames(3, 'RIGHT');
+      const after = h?.getState?.()?.cursorPos ?? null;
+      return !!after && (after[0] !== before[0] || after[1] !== before[1]);
+    });
+    expect(cursorMoved).toBe(true);
+
+    await saveScreenshot(page, '57-ch5-arena-flow-return');
+  });
+
+  test('Chapter 5 village destroy-vs-visit ordering stays one-time in both directions', async ({ page }) => {
+    await page.goto('/?harness=true&level=5&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const villagePos = { x: 12, y: 10 };
+
+    const openMenuAtVillage = async (team: 'player' | 'enemy') => {
+      const setup = await page.evaluate(({ x, y, team }: { x: number; y: number; team: 'player' | 'enemy' }) => {
+        const g = (window as any).__gameRef;
+        const eirika = g?.units?.get?.('Eirika');
+        if (!g || !g.board || !eirika) return false;
+        eirika.team = team;
+        eirika.finished = false;
+        eirika.hasMoved = false;
+        eirika.hasAttacked = false;
+        eirika.hasTraded = false;
+        g.board.moveUnit(eirika, x, y);
+        g.cursor.setPos(x, y);
+        g.selectedUnit = eirika;
+        g._moveOrigin = [x, y];
+        g.state.change('menu');
+        return true;
+      }, { ...villagePos, team });
+      expect(setup).toBe(true);
+      await stepFrames(page, 8);
+    };
+
+    // Visit first -> destroy path should no longer be available.
+    await page.evaluate(async () => {
+      await (window as any).__harness.loadLevelClean('5');
+    });
+    await stepFrames(page, 8);
+
+    await openMenuAtVillage('player');
+    const pickedVisit = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const st = g?.state?.getCurrentState?.();
+      if (!st || st.name !== 'menu' || !st.menu) return false;
+      const idx = st.menu.options.findIndex((o: any) => o?.label === 'Visit');
+      if (idx < 0) return false;
+      st.menu.selectedIndex = idx;
+      return true;
+    });
+    expect(pickedVisit).toBe(true);
+    await stepFrames(page, 2, 'SELECT');
+    for (let i = 0; i < 1200; i++) {
+      await stepFrames(page, 2, 'BACK');
+      const done = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        return g?.state?.getCurrentState?.()?.name !== 'event';
+      });
+      if (done) break;
+    }
+
+    await openMenuAtVillage('enemy');
+    const destroyAfterVisit = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const st = g?.state?.getCurrentState?.();
+      const labels = st?.menu?.options?.map((o: any) => o?.label) ?? [];
+      const regions = g?.currentLevel?.regions ?? [];
+        return {
+          labels,
+          villagePresent: regions.some((r: any) => r?.nid === 'Village2'),
+          destroyPresent: regions.some((r: any) => r?.nid === 'DestroyVillage2'),
+        };
+      });
+
+    expect(destroyAfterVisit.labels).not.toContain('Destructible');
+    expect(destroyAfterVisit.villagePresent).toBe(false);
+    expect(destroyAfterVisit.destroyPresent).toBe(false);
+
+    // Destroy first -> visit path should no longer be available.
+    await page.evaluate(async () => {
+      await (window as any).__harness.loadLevelClean('5');
+    });
+    await stepFrames(page, 8);
+
+    const forcedDestroy = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const eirika = g?.units?.get?.('Eirika');
+      if (!g || !eirika || !g.board || !g.currentLevel?.regions) return false;
+
+      eirika.team = 'enemy';
+      eirika.finished = false;
+      eirika.hasMoved = false;
+      eirika.hasAttacked = false;
+      eirika.hasTraded = false;
+      g.board.moveUnit(eirika, 12, 10);
+
+      g.currentLevel.regions = (g.currentLevel.regions ?? []).filter((r: any) => r?.nid !== 'DestroyVillage2' && r?.nid !== 'Village2');
+      const ruin = g?.tilemap?.layers?.find?.((l: any) => l?.nid === 'Ruin2');
+      if (ruin) {
+        ruin.visible = true;
+      }
+      return true;
+    });
+    expect(forcedDestroy).toBe(true);
+    await stepFrames(page, 2, 'BACK');
+    await settle(page, 350);
+
+    await openMenuAtVillage('player');
+    const visitAfterDestroy = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const st = g?.state?.getCurrentState?.();
+      const labels = st?.menu?.options?.map((o: any) => o?.label) ?? [];
+      const eirika = g?.units?.get?.('Eirika');
+      const regions = g?.currentLevel?.regions ?? [];
+      const rewardCount = (eirika?.items ?? []).filter((it: any) => it?.nid === 'Armorslayer').length;
+      return {
+        labels,
+        rewardCount,
+        villagePresent: regions.some((r: any) => r?.nid === 'Village2'),
+        destroyPresent: regions.some((r: any) => r?.nid === 'DestroyVillage2'),
+        ruinVisible: !!g?.tilemap?.layers?.find?.((l: any) => l?.nid === 'Ruin2')?.visible,
+      };
+    });
+
+    expect(visitAfterDestroy.labels).not.toContain('Visit');
+    expect(visitAfterDestroy.rewardCount).toBe(0);
+    expect(visitAfterDestroy.villagePresent).toBe(false);
+    expect(visitAfterDestroy.destroyPresent).toBe(false);
+    expect(visitAfterDestroy.ruinVisible).toBe(true);
+
+    await saveScreenshot(page, '58-ch5-village-ordering-visit-vs-destroy');
+  });
+
+  test('Chapter 5 turn events are idempotent across repeated long-window triggers', async ({ page }) => {
+    await page.goto('/?harness=true&level=5&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const turnCases = [
+      { turn: 2, ids: ['116', '117'] },
+      { turn: 4, ids: ['118', '119'] },
+      { turn: 8, ids: ['120', '121'] },
+    ];
+
+    for (const turnCase of turnCases) {
+      await page.evaluate(async () => {
+        await (window as any).__harness.loadLevelClean('5');
+      });
+      await stepFrames(page, 8);
+
+      const initialTrigger = await page.evaluate((turn: number) => {
+        const h = (window as any).__harness;
+        const g = (window as any).__gameRef;
+        if (!h || !g) return false;
+        g.turnCount = turn;
+        (g as any).turncount = turn;
+        return h.triggerEvent('turn_change');
+      }, turnCase.turn);
+      expect(initialTrigger).toBe(true);
+
+      for (let i = 0; i < 1200; i++) {
+        await stepFrames(page, 2, 'BACK');
+        const done = await page.evaluate(() => {
+          const g = (window as any).__gameRef;
+          const currentState = g?.state?.getCurrentState?.()?.name ?? null;
+          const queueLen = g?.eventManager?.eventQueue?.length ?? 0;
+          return currentState !== 'event' && queueLen === 0;
+        });
+        if (done) break;
+      }
+
+      const baseline = await page.evaluate((ids: string[]) => {
+        const g = (window as any).__gameRef;
+        return {
+          spawned: ids.map((id) => ({ id, pos: g?.units?.get?.(id)?.position ?? null })),
+          enemyCount: Array.from(g?.units?.values?.() ?? []).filter((u: any) => u?.team === 'enemy' && !u?.dead).length,
+        };
+      }, turnCase.ids);
+      for (const unit of baseline.spawned) {
+        expect(unit.pos).not.toBeNull();
+      }
+
+      for (let rep = 0; rep < 3; rep++) {
+        await page.evaluate((turn: number) => {
+          const h = (window as any).__harness;
+          const g = (window as any).__gameRef;
+          if (!h || !g) return;
+          g.turnCount = turn;
+          (g as any).turncount = turn;
+          h.triggerEvent('turn_change');
+        }, turnCase.turn);
+
+        for (let i = 0; i < 1200; i++) {
+          await stepFrames(page, 2, 'BACK');
+          const done = await page.evaluate(() => {
+            const g = (window as any).__gameRef;
+            const state = g?.state?.getCurrentState?.()?.name ?? null;
+            const queueLen = g?.eventManager?.eventQueue?.length ?? 0;
+            return state !== 'event' && queueLen === 0;
+          });
+          if (done) break;
+        }
+
+        const snapshot = await page.evaluate((ids: string[]) => {
+          const g = (window as any).__gameRef;
+          return {
+            levelNid: g?.currentLevel?.nid ?? null,
+            state: g?.state?.getCurrentState?.()?.name ?? null,
+            stackDepth: (g?.state as any)?.stack?.length ?? 0,
+            enemyCount: Array.from(g?.units?.values?.() ?? []).filter((u: any) => u?.team === 'enemy' && !u?.dead).length,
+            spawned: ids.map((id) => ({ id, pos: g?.units?.get?.(id)?.position ?? null })),
+          };
+        }, turnCase.ids);
+
+        expect(snapshot.levelNid).toBe('5');
+        expect(snapshot.state).not.toBe('title');
+        expect(snapshot.state).not.toBe('title_main');
+        expect(snapshot.stackDepth).toBeLessThanOrEqual(3);
+        expect(snapshot.enemyCount).toBe(baseline.enemyCount);
+        for (const unit of snapshot.spawned) {
+          expect(unit.pos).not.toBeNull();
+        }
+      }
+    }
+
+    await saveScreenshot(page, '59-ch5-turn-event-idempotency');
+  });
 });
 
 // ---------------------------------------------------------------------------

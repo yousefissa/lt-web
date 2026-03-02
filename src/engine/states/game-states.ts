@@ -1616,7 +1616,7 @@ export class MenuState extends State {
           if (!didTrigger && subNid === 'Destructible' && region?.nid?.startsWith('Destroy') && game.currentLevel?.regions) {
             const aliasNid = region.nid.replace(/^Destroy/, '');
             const aliasRegion = game.currentLevel.regions.find(
-              (r) => r.nid === aliasNid,
+              (r: RegionData) => r.nid === aliasNid,
             );
             if (aliasRegion) {
               const aliasCtx = {
@@ -1642,11 +1642,25 @@ export class MenuState extends State {
             );
           }
         }
-        // Remove only_once regions after triggering
+        // Remove only_once regions after triggering. For village tiles that
+        // define both Visit + Destructible sibling regions on the same tile,
+        // consume both siblings so interaction order stays one-time.
         if (didTrigger && region?.only_once && game.currentLevel?.regions) {
-          game.currentLevel.regions = game.currentLevel.regions.filter(
-            (r: RegionData) => r.nid !== regionNid,
-          );
+          const siblingNid = regionNid.startsWith('Destroy')
+            ? regionNid.replace(/^Destroy/, '')
+            : `Destroy${regionNid}`;
+          game.currentLevel.regions = game.currentLevel.regions.filter((r: RegionData) => {
+            if (r.nid === regionNid) return false;
+            if (
+              r.nid === siblingNid &&
+              r.region_type.toLowerCase() === 'event' &&
+              r.position[0] === region.position[0] &&
+              r.position[1] === region.position[1]
+            ) {
+              return false;
+            }
+            return true;
+          });
         }
         if (unit) unit.finished = true;
         this.menu = null;
@@ -4322,10 +4336,24 @@ export class AIState extends MapState {
                 );
               }
 
-              // Remove region if only_once
+              // Remove region if only_once. Also consume Visit/Destructible
+              // sibling on the same tile so AI/player ordering is one-time.
               if (triggered && region.only_once) {
-                const idx = regions.indexOf(region);
-                if (idx !== -1) regions.splice(idx, 1);
+                const siblingNid = region.nid.startsWith('Destroy')
+                  ? region.nid.replace(/^Destroy/, '')
+                  : `Destroy${region.nid}`;
+                for (let i = regions.length - 1; i >= 0; i--) {
+                  const candidate = regions[i];
+                  const isTriggeredRegion = candidate === region;
+                  const isSiblingRegion =
+                    candidate.nid === siblingNid &&
+                    candidate.region_type === 'event' &&
+                    candidate.position[0] === region.position[0] &&
+                    candidate.position[1] === region.position[1];
+                  if (isTriggeredRegion || isSiblingRegion) {
+                    regions.splice(i, 1);
+                  }
+                }
               }
 
               // Push EventState if events were triggered
