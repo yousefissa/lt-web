@@ -96,6 +96,16 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 ### Recent Changes
 
+- **Chapter 3 outro branch coverage (recruit-dependent transition):**
+  - Added mechanics regressions in `tests/harness.spec.ts` for:
+    - Ch.3 outro branch with Neimi+Colm alive confirms Colm becomes `player`
+      during outro before transition to Ch.4
+    - Ch.3 outro branch with Colm dead still transitions cleanly to Ch.4
+      without title-state fallback
+  - Added screenshots:
+    `47-ch3-outro-colm-player-before-ch4.png`,
+    `48-ch3-outro-colm-dead-transition-ok.png`.
+  - Full Playwright harness suite now passes: **39/39**.
 - **Chapter 3 Colm flow coverage (spawn + recruitment):**
   - Added mechanics regressions in `tests/harness.spec.ts` for:
     - Ch.3 `other_turn_change` event spawns Colm and moves him to chest room

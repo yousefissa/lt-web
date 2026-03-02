@@ -26,5 +26,7 @@
 - Ch.3 Colm spawn event (`3_Turn2`) uses trigger `other_turn_change` with condition
   `game.turncount == 1` in this data set; harness tests should set both `turnCount` and
   `turncount` before triggering for deterministic behavior.
+- Ch.3 outro validation should assert recruit branch behavior during the outro timeline
+  (Colm becomes `player`) rather than after Ch.4 loads, since Ch.4 intro removes many units.
 - Magic sword harness regression should assert deterministic execution signals (state resolution,
   weapon uses decrement) rather than RNG-dependent HP damage.

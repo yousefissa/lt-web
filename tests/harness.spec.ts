@@ -1713,6 +1713,165 @@ test.describe('Sacred Stones Chapter Mechanics', () => {
 
     await saveScreenshot(page, '46-ch3-neimi-recruits-colm');
   });
+
+  test('Chapter 3 outro branch sets Colm to player before Chapter 4 transition', async ({ page }) => {
+    await page.goto('/?harness=true&level=3&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    // Make sure Colm exists/alive and Neimi alive so the outro branch runs.
+    const setup = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const colm = g?.units?.get?.('Colm');
+      const neimi = g?.units?.get?.('Neimi');
+      const eirika = g?.units?.get?.('Eirika');
+      const bazba = g?.units?.get?.('Bazba');
+      if (!g || !g.board || !eirika || !colm || !neimi) return false;
+
+      colm.dead = false;
+      neimi.dead = false;
+
+      if (bazba) {
+        bazba.currentHp = 0;
+        bazba.dead = true;
+        if (bazba.position) g.board.removeUnit(bazba);
+      }
+
+      eirika.finished = false;
+      eirika.hasMoved = false;
+      eirika.hasAttacked = false;
+      eirika.hasTraded = false;
+      g.board.moveUnit(eirika, 14, 1);
+      g.cursor.setPos(14, 1);
+      g.selectedUnit = eirika;
+      g._moveOrigin = [14, 1];
+      g.state.change('menu');
+      return true;
+    });
+    expect(setup).toBe(true);
+
+    await stepFrames(page, 8);
+
+    const choseSeize = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const st = g?.state?.getCurrentState?.();
+      if (!st || st.name !== 'menu' || !st.menu) return false;
+      const idx = st.menu.options.findIndex((o: any) => o?.label === 'Seize');
+      if (idx < 0) return false;
+      st.menu.selectedIndex = idx;
+      return true;
+    });
+    expect(choseSeize).toBe(true);
+
+    await stepFrames(page, 2, 'SELECT');
+
+    // Skip through long outro and wait for level transition.
+    let sawColmPlayerInOutro = false;
+    for (let i = 0; i < 2500; i++) {
+      await stepFrames(page, 2, 'BACK');
+      const snap = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        const colm = g?.units?.get?.('Colm');
+        return {
+          levelNid: g?.currentLevel?.nid ?? null,
+          colmTeam: colm?.team ?? null,
+        };
+      });
+      if (snap.colmTeam === 'player') sawColmPlayerInOutro = true;
+      if (snap.levelNid === '4') break;
+    }
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      return {
+        levelNid: g?.currentLevel?.nid ?? null,
+      };
+    });
+
+    expect(result.levelNid).toBe('4');
+    expect(sawColmPlayerInOutro).toBe(true);
+
+    await saveScreenshot(page, '47-ch3-outro-colm-player-before-ch4');
+  });
+
+  test('Chapter 3 outro handles Colm dead without blocking transition', async ({ page }) => {
+    await page.goto('/?harness=true&level=3&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const setup = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const colm = g?.units?.get?.('Colm');
+      const eirika = g?.units?.get?.('Eirika');
+      const bazba = g?.units?.get?.('Bazba');
+      if (!g || !g.board || !eirika || !colm) return false;
+
+      // Force branch condition false.
+      colm.currentHp = 0;
+      colm.dead = true;
+      if (colm.position) g.board.removeUnit(colm);
+
+      if (bazba) {
+        bazba.currentHp = 0;
+        bazba.dead = true;
+        if (bazba.position) g.board.removeUnit(bazba);
+      }
+
+      eirika.finished = false;
+      eirika.hasMoved = false;
+      eirika.hasAttacked = false;
+      eirika.hasTraded = false;
+      g.board.moveUnit(eirika, 14, 1);
+      g.cursor.setPos(14, 1);
+      g.selectedUnit = eirika;
+      g._moveOrigin = [14, 1];
+      g.state.change('menu');
+      return true;
+    });
+    expect(setup).toBe(true);
+
+    await stepFrames(page, 8);
+
+    const choseSeize = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const st = g?.state?.getCurrentState?.();
+      if (!st || st.name !== 'menu' || !st.menu) return false;
+      const idx = st.menu.options.findIndex((o: any) => o?.label === 'Seize');
+      if (idx < 0) return false;
+      st.menu.selectedIndex = idx;
+      return true;
+    });
+    expect(choseSeize).toBe(true);
+
+    await stepFrames(page, 2, 'SELECT');
+
+    let hitTitle = false;
+    for (let i = 0; i < 2500; i++) {
+      await stepFrames(page, 2, 'BACK');
+      const snap = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        return {
+          levelNid: g?.currentLevel?.nid ?? null,
+          state: g?.state?.getCurrentState?.()?.name ?? null,
+        };
+      });
+      if (snap.state === 'title' || snap.state === 'title_main') hitTitle = true;
+      if (snap.levelNid === '4') break;
+    }
+
+    const final = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      return {
+        levelNid: g?.currentLevel?.nid ?? null,
+        state: g?.state?.getCurrentState?.()?.name ?? null,
+      };
+    });
+
+    expect(hitTitle).toBe(false);
+    expect(final.levelNid).toBe('4');
+
+    await saveScreenshot(page, '48-ch3-outro-colm-dead-transition-ok');
+  });
 });
 
 // ---------------------------------------------------------------------------
