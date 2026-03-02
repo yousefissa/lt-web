@@ -31,5 +31,7 @@
 - Ch.4 Village2 recruitment (`change_team;Lute;player` + `add_unit;...;closest`) can leave Lute
   unplaced (`position == null`) in some deterministic harness setups; assert team conversion and
   region consumption as primary correctness checks.
+- Ch.4 Turn3 cameo script intentionally removes `L'arachel`, `Dozla`, and `Rennac` after dialogue;
+  regression checks should assert final `position == null` rather than persistent on-map presence.
 - Magic sword harness regression should assert deterministic execution signals (state resolution,
   weapon uses decrement) rather than RNG-dependent HP damage.

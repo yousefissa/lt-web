@@ -2011,6 +2011,141 @@ test.describe('Sacred Stones Chapter Mechanics', () => {
 
     await saveScreenshot(page, '51-ch4-snag-bridge-layer-revealed');
   });
+
+  test('Chapter 4 Village1 visit grants Iron Axe and consumes region', async ({ page }) => {
+    await page.goto('/?harness=true&level=4&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const setup = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const eirika = g?.units?.get?.('Eirika');
+      if (!g || !g.board || !eirika) return false;
+      eirika.finished = false;
+      eirika.hasMoved = false;
+      eirika.hasAttacked = false;
+      eirika.hasTraded = false;
+      g.board.moveUnit(eirika, 8, 2); // Village1
+      g.cursor.setPos(8, 2);
+      g.selectedUnit = eirika;
+      g._moveOrigin = [8, 2];
+      g.state.change('menu');
+      return true;
+    });
+    expect(setup).toBe(true);
+    await stepFrames(page, 8);
+
+    const selectedVisit = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const st = g?.state?.getCurrentState?.();
+      if (!st || st.name !== 'menu' || !st.menu) return false;
+      const idx = st.menu.options.findIndex((o: any) => o?.label === 'Visit');
+      if (idx < 0) return false;
+      st.menu.selectedIndex = idx;
+      return true;
+    });
+    expect(selectedVisit).toBe(true);
+
+    await stepFrames(page, 2, 'SELECT');
+    for (let i = 0; i < 1200; i++) {
+      await stepFrames(page, 2, 'BACK');
+      const done = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        const eirika = g?.units?.get?.('Eirika');
+        const gotItem = (eirika?.items ?? []).some((it: any) => it?.nid === 'Iron_Axe');
+        return gotItem || g?.state?.getCurrentState?.()?.name !== 'event';
+      });
+      if (done) break;
+    }
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const eirika = g?.units?.get?.('Eirika');
+      const itemNids = (eirika?.items ?? []).map((it: any) => it?.nid);
+      const villageStillPresent = (g?.currentLevel?.regions ?? []).some((r: any) => r?.nid === 'Village1');
+      return { itemNids, villageStillPresent };
+    });
+
+    expect(result.itemNids).toContain('Iron_Axe');
+    expect(result.villageStillPresent).toBe(false);
+
+    await saveScreenshot(page, '52-ch4-village1-iron-axe');
+  });
+
+  test('Chapter 4 turn-3 cameo event exits temporary units cleanly', async ({ page }) => {
+    await page.goto('/?harness=true&level=4&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const triggered = await page.evaluate(() => {
+      const h = (window as any).__harness;
+      const g = (window as any).__gameRef;
+      if (!h || !g) return false;
+      g.turnCount = 3;
+      (g as any).turncount = 3;
+      return h.triggerEvent('turn_change');
+    });
+    expect(triggered).toBe(true);
+
+    for (let i = 0; i < 1600; i++) {
+      await stepFrames(page, 2, 'BACK');
+      const done = await page.evaluate(() => {
+        const g = (window as any).__gameRef;
+        return g?.state?.getCurrentState?.()?.name !== 'event';
+      });
+      if (done) break;
+    }
+
+    const cameo = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const larachel = g?.units?.get?.("L'arachel");
+      const dozla = g?.units?.get?.('Dozla');
+      const rennac = g?.units?.get?.('Rennac');
+      return {
+        larachelPos: larachel?.position ?? null,
+        dozlaPos: dozla?.position ?? null,
+        rennacPos: rennac?.position ?? null,
+      };
+    });
+
+    expect(cameo.larachelPos).toBeNull();
+    expect(cameo.dozlaPos).toBeNull();
+    expect(cameo.rennacPos).toBeNull();
+
+    await saveScreenshot(page, '53-ch4-turn3-cameo-cleared');
+  });
+
+  test('Chapter 5 turn-4 event spawns Brigand2 group', async ({ page }) => {
+    await page.goto('/?harness=true&level=5&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const triggered = await page.evaluate(() => {
+      const h = (window as any).__harness;
+      const g = (window as any).__gameRef;
+      if (!h || !g) return false;
+      g.turnCount = 4;
+      (g as any).turncount = 4;
+      return h.triggerEvent('turn_change');
+    });
+    expect(triggered).toBe(true);
+
+    await settle(page, 400);
+    await stepFrames(page, 10);
+
+    const brigands = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      return ['118', '119'].map((id) => {
+        const u = g?.units?.get?.(id);
+        return { id, pos: u?.position ?? null };
+      });
+    });
+    for (const b of brigands) {
+      expect(b.pos).not.toBeNull();
+    }
+
+    await saveScreenshot(page, '54-ch5-turn4-brigand2-spawn');
+  });
 });
 
 // ---------------------------------------------------------------------------

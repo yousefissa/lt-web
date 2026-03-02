@@ -96,6 +96,17 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 ### Recent Changes
 
+- **Chapter 4/5 additional event sweep (Village1, Turn3 cameo, Turn4 brigands):**
+  - Added mechanics regressions in `tests/harness.spec.ts` for:
+    - Ch.4 Village1 visit grants `Iron_Axe` and consumes region
+    - Ch.4 Turn3 cameo event (`L'arachel`/`Dozla`/`Rennac`) exits cleanly
+      with temporary units removed from map
+    - Ch.5 Turn4 event spawns `Brigand2` group (`118`,`119`)
+  - Added screenshots:
+    `52-ch4-village1-iron-axe.png`,
+    `53-ch4-turn3-cameo-cleared.png`,
+    `54-ch5-turn4-brigand2-spawn.png`.
+  - Full Playwright harness suite now passes: **45/45**.
 - **Chapter 4 event edge-case sweep (villages, trigger region, snag bridge):**
   - Added mechanics regressions in `tests/harness.spec.ts` for:
     - Ch.4 Village2 visit recruits Lute and consumes region
