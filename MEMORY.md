@@ -14,5 +14,8 @@
   matching events exist (reproduced with Ch.5 Natasha/Joshua recruitment).
 - For long village cutscenes in harness tests, use `BACK` input to enable EventState skip mode;
   relying on repeated `SELECT` can leave tests mid-event and make item assertions flaky.
+- `evaluateCondition(unit.can_unlock(region))` must handle runtime item components stored as
+  `Map<string, any>`, not just array-shaped components. Include `can_unlock` expression handling
+  (e.g. `region.nid.startswith('Chest')` / `'Door'`) for correct Chest/Door menu gating.
 - Magic sword harness regression should assert deterministic execution signals (state resolution,
   weapon uses decrement) rather than RNG-dependent HP damage.

@@ -7923,7 +7923,8 @@ export class EventState extends State {
           const keyItem = unlockUnit.items.find(item => {
             for (const [compName] of item.components) {
               if (compName === 'unlock' || compName === 'Unlock' ||
-                  compName === 'keys' || compName === 'Keys') return true;
+                  compName === 'keys' || compName === 'Keys' ||
+                  compName === 'can_unlock') return true;
             }
             return false;
           });

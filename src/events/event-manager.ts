@@ -526,14 +526,60 @@ export function evaluateCondition(
   const canUnlockMatch = trimmed.match(/^(?:unit\d?\.)?can_unlock\s*\(\s*(\w+)\s*\)/);
   if (canUnlockMatch) {
     const unit = context.unit1;
+    const region = context.region;
     if (!unit) return false;
     const items = unit.items ?? [];
+
+    const canUnlockByExpr = (expr: unknown): boolean => {
+      if (typeof expr !== 'string') return !!expr;
+      const trimmedExpr = expr.trim();
+      if (!region?.nid) return false;
+
+      // Common LT patterns for key restrictions.
+      const chestMatch = trimmedExpr.match(/^region\.nid\.startswith\(\s*['"]Chest['"]\s*\)$/);
+      if (chestMatch) return String(region.nid).startsWith('Chest');
+      const doorMatch = trimmedExpr.match(/^region\.nid\.startswith\(\s*['"]Door['"]\s*\)$/);
+      if (doorMatch) return String(region.nid).startsWith('Door');
+
+      // Fallback: try generic condition evaluation with current context.
+      return evaluateCondition(trimmedExpr, context);
+    };
+
     return items.some((item: any) => {
-      const comps = item.components ?? [];
-      return comps.some((c: any) => {
-        const name = Array.isArray(c) ? c[0] : c.nid ?? c.name ?? '';
-        return name === 'unlock' || name === 'lockpick' || name === 'key';
-      });
+      const comps = item.components;
+
+      // Runtime ItemObject stores components as Map<string, any>.
+      if (comps instanceof Map) {
+        if (comps.has('can_unlock')) {
+          return canUnlockByExpr(comps.get('can_unlock'));
+        }
+        return comps.has('unlock') || comps.has('lockpick') || comps.has('key') ||
+               comps.has('keys') || comps.has('Key') || comps.has('Keys');
+      }
+
+      // Fallbacks for prefab-like shapes used by tools/tests.
+      if (Array.isArray(comps)) {
+        const canUnlockComp = comps.find((c: any) => (Array.isArray(c) ? c[0] : c?.nid ?? c?.name) === 'can_unlock');
+        if (canUnlockComp) {
+          const expr = Array.isArray(canUnlockComp) ? canUnlockComp[1] : canUnlockComp?.value;
+          return canUnlockByExpr(expr);
+        }
+        return comps.some((c: any) => {
+          const name = Array.isArray(c) ? c[0] : c?.nid ?? c?.name ?? '';
+          return name === 'unlock' || name === 'lockpick' || name === 'key' ||
+                 name === 'keys' || name === 'Key' || name === 'Keys';
+        });
+      }
+
+      if (comps && typeof comps === 'object') {
+        if ('can_unlock' in comps) {
+          return canUnlockByExpr((comps as any).can_unlock);
+        }
+        return 'unlock' in comps || 'lockpick' in comps || 'key' in comps ||
+               'keys' in comps || 'Key' in comps || 'Keys' in comps;
+      }
+
+      return false;
     });
   }
 

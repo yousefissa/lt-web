@@ -38,6 +38,10 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 ### Known Bugs
 
+- [x] **Chest/Door region checks could crash in menu state (`comps.some is not a function`).** *(Fixed)*
+  `evaluateCondition(unit.can_unlock(region))` assumed item components were array-shaped,
+  but runtime `ItemObject.components` is a `Map`. Added robust `Map`/array/object handling,
+  support for `can_unlock` expressions, and region-prefix checks (`Chest`/`Door`).
 - [x] **Talk command menu missed level-scoped conversations (e.g. Natasha→Joshua in Ch.5).** *(Fixed)*
   Talk option detection in `MenuState` called `getEventsForTrigger()` without
   `levelNid`, so level-specific `on_talk` events were filtered out. Added
@@ -88,6 +92,19 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 ### Recent Changes
 
+- **Chapter 3 unlock interaction coverage + can_unlock fix:**
+  - Added mechanics regressions in `tests/harness.spec.ts` for:
+    - Ch.3 chest interaction gating + unlock + loot (`Javelin`)
+    - Ch.3 door interaction gating + unlock region removal
+  - Fixed `unit.can_unlock(region)` condition handling in
+    `src/events/event-manager.ts` to support runtime `Map` components and
+    `can_unlock` component expressions (including `region.nid.startswith(...)`).
+  - Updated unlock consumption in `src/engine/states/game-states.ts` to treat
+    `can_unlock` items as key items for use decrement/removal.
+  - Added screenshots:
+    `39-ch3-chest1-unlock-javelin.png`,
+    `40-ch3-door1-unlock-opened.png`.
+  - Full Playwright harness suite now passes: **31/31**.
 - **Chapter interaction coverage expansion (villages + shops):**
   - Added chapter mechanics regressions in `tests/harness.spec.ts` for:
     - Ch.2 Village1 Visit grants `Red_Gem` and consumes region

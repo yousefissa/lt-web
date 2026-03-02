@@ -1130,6 +1130,165 @@ test.describe('Sacred Stones Chapter Mechanics', () => {
 
     await saveScreenshot(page, '38-ch5-vendor-armory-menu-options');
   });
+
+  test('Chapter 3 chest interaction requires key and grants chest loot', async ({ page }) => {
+    await page.goto('/?harness=true&level=3&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const setupNoKey = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const eirika = g?.units?.get?.('Eirika');
+      if (!g || !g.board || !eirika) return false;
+      g.board.moveUnit(eirika, 6, 12); // Chest1 tile
+      g.cursor.setPos(6, 12);
+      g.selectedUnit = eirika;
+      g._moveOrigin = [6, 12];
+      g.state.change('menu');
+      return true;
+    });
+    expect(setupNoKey).toBe(true);
+    await stepFrames(page, 8);
+
+    const chestWithoutKey = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const st = g?.state?.getCurrentState?.();
+      if (!st || st.name !== 'menu' || !st.menu) return false;
+      return st.menu.options.some((o: any) => o?.label === 'Chest');
+    });
+    expect(chestWithoutKey).toBe(false);
+
+    await stepFrames(page, 2, 'BACK');
+    await stepFrames(page, 2, 'BACK');
+
+    const gaveKey = await page.evaluate(() => {
+      const h = (window as any).__harness;
+      return h?.giveItem?.('Eirika', 'Chest_Key') ?? false;
+    });
+    expect(gaveKey).toBe(true);
+
+    const setupWithKey = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const eirika = g?.units?.get?.('Eirika');
+      if (!g || !g.board || !eirika) return false;
+      g.board.moveUnit(eirika, 6, 12);
+      g.cursor.setPos(6, 12);
+      g.selectedUnit = eirika;
+      g._moveOrigin = [6, 12];
+      g.state.change('menu');
+      return true;
+    });
+    expect(setupWithKey).toBe(true);
+    await stepFrames(page, 8);
+
+    const selectedChest = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const st = g?.state?.getCurrentState?.();
+      if (!st || st.name !== 'menu' || !st.menu) return false;
+      const idx = st.menu.options.findIndex((o: any) => o?.label === 'Chest');
+      if (idx < 0) return false;
+      st.menu.selectedIndex = idx;
+      return true;
+    });
+    expect(selectedChest).toBe(true);
+
+    await stepFrames(page, 2, 'SELECT');
+    await settle(page, 300);
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const eirika = g?.units?.get?.('Eirika');
+      const itemNids = (eirika?.items ?? []).map((it: any) => it?.nid);
+      const chestStillPresent = (g?.currentLevel?.regions ?? []).some((r: any) => r?.nid === 'Chest1');
+      const chestKeyUses = (eirika?.items ?? []).find((it: any) => it?.nid === 'Chest_Key')?.uses ?? null;
+      return { itemNids, chestStillPresent, chestKeyUses };
+    });
+
+    expect(result.itemNids).toContain('Javelin');
+    expect(result.chestStillPresent).toBe(false);
+    // Key item is consumed and removed when uses reach 0.
+    expect(result.chestKeyUses).toBeNull();
+
+    await saveScreenshot(page, '39-ch3-chest1-unlock-javelin');
+  });
+
+  test('Chapter 3 door interaction requires key and opens door region', async ({ page }) => {
+    await page.goto('/?harness=true&level=3&bundle=false');
+    await waitForHarness(page);
+    await stepFrames(page, 10);
+
+    const setupNoKey = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const eirika = g?.units?.get?.('Eirika');
+      if (!g || !g.board || !eirika) return false;
+      g.board.moveUnit(eirika, 2, 2); // Door1 vertical region tile
+      g.cursor.setPos(2, 2);
+      g.selectedUnit = eirika;
+      g._moveOrigin = [2, 2];
+      g.state.change('menu');
+      return true;
+    });
+    expect(setupNoKey).toBe(true);
+    await stepFrames(page, 8);
+
+    const doorWithoutKey = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const st = g?.state?.getCurrentState?.();
+      if (!st || st.name !== 'menu' || !st.menu) return false;
+      return st.menu.options.some((o: any) => o?.label === 'Door');
+    });
+    expect(doorWithoutKey).toBe(false);
+
+    await stepFrames(page, 2, 'BACK');
+    await stepFrames(page, 2, 'BACK');
+
+    const gaveKey = await page.evaluate(() => {
+      const h = (window as any).__harness;
+      return h?.giveItem?.('Eirika', 'Door_Key') ?? false;
+    });
+    expect(gaveKey).toBe(true);
+
+    const setupWithKey = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const eirika = g?.units?.get?.('Eirika');
+      if (!g || !g.board || !eirika) return false;
+      g.board.moveUnit(eirika, 2, 2);
+      g.cursor.setPos(2, 2);
+      g.selectedUnit = eirika;
+      g._moveOrigin = [2, 2];
+      g.state.change('menu');
+      return true;
+    });
+    expect(setupWithKey).toBe(true);
+    await stepFrames(page, 8);
+
+    const selectedDoor = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const st = g?.state?.getCurrentState?.();
+      if (!st || st.name !== 'menu' || !st.menu) return false;
+      const idx = st.menu.options.findIndex((o: any) => o?.label === 'Door');
+      if (idx < 0) return false;
+      st.menu.selectedIndex = idx;
+      return true;
+    });
+    expect(selectedDoor).toBe(true);
+
+    await stepFrames(page, 2, 'SELECT');
+    await settle(page, 250);
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
+      const eirika = g?.units?.get?.('Eirika');
+      const doorStillPresent = (g?.currentLevel?.regions ?? []).some((r: any) => r?.nid === 'Door1');
+      const doorKeyUses = (eirika?.items ?? []).find((it: any) => it?.nid === 'Door_Key')?.uses ?? null;
+      return { doorStillPresent, doorKeyUses };
+    });
+
+    expect(result.doorStillPresent).toBe(false);
+    expect(result.doorKeyUses).toBeNull();
+
+    await saveScreenshot(page, '40-ch3-door1-unlock-opened');
+  });
 });
 
 // ---------------------------------------------------------------------------
