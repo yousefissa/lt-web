@@ -12,6 +12,7 @@ When making modifications, you should generally plan out what to do in PLAN.md, 
 
 **Commit policy:** Always commit and push changes without asking for confirmation. Do not prompt the user before committing or pushing.
 After finishing implementation work, create a commit and push it to the current branch.
+This applies to all sessions and all change scopes (code, docs, config, and maintenance edits).
 
 ---
 

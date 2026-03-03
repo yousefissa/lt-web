@@ -105,6 +105,10 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 ### Recent Changes
 
+- **Process docs update (agent commit/push policy clarified):**
+  - Updated `AGENTS.md` commit policy section to explicitly state the
+    rule applies to all session types and all edit scopes (code/docs/config).
+
 - **Dialogue text-speed parity fix (settings now actually affect typing):**
   - Updated `src/ui/dialog.ts` to use LT-style time-based typing speed
     (milliseconds per character) instead of a fixed chars-per-frame step.
