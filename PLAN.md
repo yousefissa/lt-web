@@ -38,6 +38,9 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 ### Known Bugs
 
+- [x] **Settings `Text Speed` had no effect on dialogue typing.** *(Fixed)*
+  `EventState` now passes `_setting_text_speed` into `Dialog`, and dialog typing
+  now uses LT-style time-based cadence (ms-per-character, including `0` = instant).
 - [x] **Some Ch.5 destructible village events failed to fire from `DestroyVillageX` regions.** *(Fixed)*
   Event conditions in default data can target sibling `VillageX` NIDs while the
   interaction region is `DestroyVillageX`. Added compatibility fallback for
@@ -101,6 +104,17 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
   resolves, matching Python's synchronous behavior and preventing async race frames.
 
 ### Recent Changes
+
+- **Dialogue text-speed parity fix (settings now actually affect typing):**
+  - Updated `src/ui/dialog.ts` to use LT-style time-based typing speed
+    (milliseconds per character) instead of a fixed chars-per-frame step.
+  - Updated `src/engine/states/game-states.ts` to read `_setting_text_speed`
+    and pass it into each new `Dialog` instance, with default fallback `32`.
+  - Added LT dialog speed overrides:
+    - Per-command `text_speed` (keyword and semicolon positional forms)
+    - Inline text commands `{speed:X}`, `{starting_speed}`, `{max_speed}`
+    now update typing cadence during the same dialog line.
+  - `Text Speed = 0` now behaves like LT max-speed mode (instant reveal).
 
 - **Event-state dialog/background parity fixes + regression coverage:**
   - Fixed portrait mouth animation lifecycle in `src/engine/states/game-states.ts`:

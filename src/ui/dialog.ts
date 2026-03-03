@@ -12,8 +12,10 @@ const BOX_HEIGHT = 40;
 const BOX_MARGIN = 2;
 const INNER_PAD = 4;
 const LINE_HEIGHT = 10;
-/** Characters advanced per update() call (~2 chars per frame). */
-const DEFAULT_TYPE_SPEED = 2;
+/** Default LT text speed (milliseconds per character). */
+const DEFAULT_TEXT_SPEED_MS = 32;
+/** Default LT dialog speed multiplier (1 = normal). */
+const DEFAULT_SPEED_MULT = 1;
 
 /** Minimum box height (2 lines of text + padding). */
 const MIN_BOX_HEIGHT = 40;
@@ -96,8 +98,11 @@ export class Dialog {
   private charIndex: number;
   private speaker: string;
   private state: DialogState;
-  private typeSpeed: number;
+  private textSpeedMs: number;
+  private speedMult: number;
+  private startingSpeedMult: number;
   private frameCounter: number;
+  private charProgress: number;
   private waitingForInput: boolean;
   private lines: string[];
   private currentLine: number;
@@ -111,14 +116,23 @@ export class Dialog {
   private transitionProgress: number = 0;
   private static readonly TRANSITION_DURATION_MS = 167; // 10 frames at 60fps
 
-  constructor(text: string, speaker?: string, portrait?: EventPortrait, typeSpeed?: number) {
+  constructor(
+    text: string,
+    speaker?: string,
+    portrait?: EventPortrait,
+    textSpeedMs?: number,
+    speedMult?: number,
+  ) {
     this.text = text;
     this.displayedText = '';
     this.charIndex = 0;
     this.speaker = speaker ?? '';
     this.state = 'transition_in';
-    this.typeSpeed = typeSpeed ?? DEFAULT_TYPE_SPEED;
+    this.textSpeedMs = textSpeedMs ?? DEFAULT_TEXT_SPEED_MS;
+    this.speedMult = speedMult ?? DEFAULT_SPEED_MULT;
+    this.startingSpeedMult = this.speedMult;
     this.frameCounter = 0;
+    this.charProgress = 0;
     this.waitingForInput = false;
     this.currentLine = 0;
     this.portrait = portrait ?? null;
@@ -180,8 +194,8 @@ export class Dialog {
     return false;
   }
 
-  /** Update typewriter effect. Called once per frame. */
-  update(): void {
+  /** Update typewriter effect. `deltaMs` is elapsed time since last frame. */
+  update(deltaMs: number = 1000 / 60): void {
     // Handle transition_in: advance progress until complete, then start typing
     if (this.state === 'transition_in') {
       // ~16.67ms per frame at 60fps
@@ -195,9 +209,25 @@ export class Dialog {
 
     if (this.state !== 'typing') return;
 
-    const currentLineText = this.lines[this.currentLine] ?? '';
+    const baseTextSpeed = Number.isFinite(this.textSpeedMs)
+      ? this.textSpeedMs
+      : DEFAULT_TEXT_SPEED_MS;
+    const localSpeedMult = Number.isFinite(this.speedMult)
+      ? this.speedMult
+      : this.startingSpeedMult;
+    const effectiveTextSpeed = baseTextSpeed * localSpeedMult;
+    const instant = effectiveTextSpeed <= 0;
 
-    for (let i = 0; i < this.typeSpeed; i++) {
+    if (!instant) {
+      this.charProgress += deltaMs / effectiveTextSpeed;
+    }
+
+    while ((instant || this.charProgress >= 1) && this.state === 'typing') {
+      if (!instant) {
+        this.charProgress -= 1;
+      }
+
+      const currentLineText = this.lines[this.currentLine] ?? '';
       if (this.charIndex >= currentLineText.length) {
         // End of current line segment
         if (this.currentLine < this.lines.length - 1) {
@@ -208,6 +238,7 @@ export class Dialog {
           this.state = 'waiting';
           this.waitingForInput = true;
         }
+        this.charProgress = 0;
         return;
       }
 
@@ -219,6 +250,7 @@ export class Dialog {
         this.charIndex += 3;
         this.state = 'waiting';
         this.waitingForInput = true;
+        this.charProgress = 0;
         return;
       }
 
@@ -235,6 +267,7 @@ export class Dialog {
         this.state = 'waiting';
         this.waitingForInput = true;
         this._clearOnResume = true;
+        this.charProgress = 0;
         return;
       }
 
@@ -243,7 +276,27 @@ export class Dialog {
         this.charIndex += 3;
         this.state = 'waiting';
         this.waitingForInput = true;
+        this.charProgress = 0;
         return;
+      }
+
+      if (remaining.startsWith('{max_speed}')) {
+        this.charIndex += '{max_speed}'.length;
+        this.speedMult = 0;
+        continue;
+      }
+
+      if (remaining.startsWith('{starting_speed}')) {
+        this.charIndex += '{starting_speed}'.length;
+        this.speedMult = this.startingSpeedMult;
+        continue;
+      }
+
+      const speedMatch = remaining.match(/^\{speed:(\d+(?:\.\d+)?)\}/);
+      if (speedMatch) {
+        this.charIndex += speedMatch[0].length;
+        this.speedMult = Number(speedMatch[1]);
+        continue;
       }
 
       // {c:command;arg1;arg2} — inline event command (skip silently)
@@ -412,7 +465,16 @@ export class Dialog {
     const currentLineText = this.lines[this.currentLine] ?? '';
     // Strip inline commands for display
     let text = currentLineText.slice(this.charIndex);
-    text = text.replace(/\{w\}/g, '').replace(/\{br\}/g, '\n');
+    text = text
+      .replace(/\{w\}/g, '')
+      .replace(/\{br\}/g, '\n')
+      .replace(/\{clear\}/g, '')
+      .replace(/\{p\}/g, '')
+      .replace(/\{max_speed\}/g, '')
+      .replace(/\{starting_speed\}/g, '')
+      .replace(/\{speed:\d+(?:\.\d+)?\}/g, '')
+      .replace(/\{c:[^}]*\}/g, '')
+      .replace(/\{[^}]*\}/g, '');
     this.displayedText += text;
     this.charIndex = currentLineText.length;
 

@@ -5270,6 +5270,49 @@ export class EventState extends State {
   // Location card state
   private locationCard: { text: string; timer: number; phase: 'fade_in' | 'hold' | 'fade_out'; alpha: number } | null = null;
 
+  /** Effective dialog text speed in milliseconds per character. */
+  private getDialogTextSpeedMs(): number {
+    const game = getGame();
+    const raw = game.gameVars?.get('_setting_text_speed');
+    if (typeof raw === 'number' && Number.isFinite(raw) && raw >= 0) {
+      return raw;
+    }
+    if (typeof raw === 'string') {
+      const parsed = Number(raw);
+      if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+    }
+    return 32;
+  }
+
+  /** Optional per-dialog speed multiplier from command args (LT `text_speed`). */
+  private getDialogSpeedMultiplier(args: string[]): number {
+    const parseNumeric = (value: string): number | null => {
+      const parsed = Number(value.trim());
+      if (!Number.isFinite(parsed) || parsed < 0) return null;
+      return parsed;
+    };
+
+    // PYEV1/keyword-style args: text_speed=5 or speed=5
+    for (const arg of args) {
+      const trimmed = arg.trim();
+      const match = trimmed.match(/^(?:text_speed|speed)\s*=\s*(\d+(?:\.\d+)?)$/i);
+      if (match) {
+        const parsed = parseNumeric(match[1]);
+        if (parsed !== null) return parsed;
+      }
+    }
+
+    // Semicolon-format positional arg order:
+    // speak;speaker;text;position;width;style_nid;text_speed;...
+    const positional = args[5];
+    if (typeof positional === 'string' && positional.trim() !== '') {
+      const parsed = parseNumeric(positional);
+      if (parsed !== null) return parsed;
+    }
+
+    return 1;
+  }
+
   // -----------------------------------------------------------------------
   // Lifecycle
   // -----------------------------------------------------------------------
@@ -5456,7 +5499,7 @@ export class EventState extends State {
         this.wasDialogTyping = false;
         this.advancePointer();
       } else {
-        this.dialog.update();
+        this.dialog.update(FRAMETIME);
         const isTyping = this.dialog.isTyping();
         if (this.speakingPortrait) {
           if (isTyping && !this.wasDialogTyping) {
@@ -6262,8 +6305,16 @@ export class EventState extends State {
           }
         }
 
+        const dialogSpeedMult = this.getDialogSpeedMultiplier(args.slice(2));
+
         // Create dialog with optional portrait reference for positioning
-        this.dialog = new Dialog(text, speaker || undefined, portrait ?? undefined);
+        this.dialog = new Dialog(
+          text,
+          speaker || undefined,
+          portrait ?? undefined,
+          this.getDialogTextSpeedMs(),
+          dialogSpeedMult,
+        );
         this.wasDialogTyping = false;
 
         // Don't advance pointer — it's advanced when dialog finishes (in takeInput)
