@@ -26,6 +26,12 @@ npm run solver -- solve --iterations 4000 --workers 4 \
   --solution-out solver/solutions/chapter-3.json \
   --html solver-output/chapter-3.html
 
+# Search explicit legal action routes with cloneable states and a transposition cache
+npm run solver -- plan --scenario solver/scenarios/chapter-4.json \
+  --solution solver/solutions/chapter-4.json --beam-width 72 \
+  --branch-limit 24 --max-nodes 80000 \
+  --solution-out solver/solutions/chapter-4.json
+
 # Deterministically replay a saved solution
 npm run solver -- verify --solution solver/solutions/chapter-3.json
 npm run solver -- verify --scenario solver/scenarios/chapter-4.json \
@@ -39,8 +45,11 @@ part of that fixed problem instance.
 
 The canonical Chapter 4 benchmark fixes seed `4`. It uses the reusable standard
 event adapter and routs 22 enemies plus the Snag in 5 turns with zero deaths and
-22 cumulative damage. `--workers` parallelizes policy candidates without
-changing the gameplay RNG stream.
+22 cumulative damage. Its explicit 45-action player plan uses 82 total actions,
+down from the 83-action greedy incumbent. Two 80,000-node fixed-seed beam
+configurations challenged the damage result without finding less than 22; this
+is best-found evidence, not an optimality proof. `--workers` parallelizes policy
+candidates without changing the gameplay RNG stream.
 
 Seed-range scanning is deliberately excluded from benchmark results. The CLI
 requires `--allow-seed-search` alongside `--seed-range` and labels that path as

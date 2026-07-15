@@ -1,4 +1,5 @@
 import { performance } from 'node:perf_hooks';
+import { createHash } from 'node:crypto';
 import { AIController, type AIAction } from '../src/ai/ai-controller';
 import {
   canDouble,
@@ -312,6 +313,15 @@ export class TacticalSimulator {
     return this.cleared || this.lost || this.currentTurn > this.scenario.maxTurns;
   }
 
+  getCurrentTurn(): number {
+    return this.currentTurn;
+  }
+
+  getEvaluationScore(): number[] {
+    this.updateDerivedMetrics();
+    return this.buildScore();
+  }
+
   /**
    * Enumerate deterministic legal actions from the current player state.
    * Limits are optional beam-search pruning knobs; without them this returns
@@ -334,6 +344,7 @@ export class TacticalSimulator {
         if (validMoves.some((position) => samePosition(position, this.seizePosition!))) {
           unitActions.push({
             type: 'seize',
+            turn: this.currentTurn,
             actor: unit.nid,
             position: clonePosition(this.seizePosition)!,
             heuristic: Number.MAX_SAFE_INTEGER,
@@ -352,6 +363,7 @@ export class TacticalSimulator {
             if (distance < item.getMinRange() || distance > item.getMaxRange()) continue;
             attacks.push({
               type: 'attack',
+              turn: this.currentTurn,
               actor: unit.nid,
               target: target.nid,
               item: item.nid,
@@ -385,6 +397,7 @@ export class TacticalSimulator {
             if (amount <= 0) continue;
             heals.push({
               type: 'heal',
+              turn: this.currentTurn,
               actor: unit.nid,
               target: target.nid,
               item: item.nid,
@@ -412,6 +425,7 @@ export class TacticalSimulator {
         heuristic += (unit.currentHp / Math.max(1, unit.maxHp)) * this.policy.stayHealthy;
         moves.push({
           type: 'move',
+          turn: this.currentTurn,
           actor: unit.nid,
           position: clonePosition(position)!,
           heuristic,
@@ -423,6 +437,7 @@ export class TacticalSimulator {
       if (options.includeWait !== false) {
         unitActions.push({
           type: 'wait',
+          turn: this.currentTurn,
           actor: unit.nid,
           position: original,
           heuristic: -1,
@@ -434,10 +449,77 @@ export class TacticalSimulator {
     return actions.sort(comparePlannerActions);
   }
 
+  /** Return the legacy policy's next action as an explicit planner action. */
+  getGreedyPlayerAction(): PlannerAction | null {
+    if (!this.playerPhasePrepared || this.currentPhase !== 'player' || this.isTerminal()) return null;
+    const active = this.playerUnits().filter(
+      (unit) => unit.position && !unit.isDead() && !unit.finished,
+    );
+    if (active.length === 0) return null;
+
+    const seize = this.findSeizeCandidate(active);
+    if (seize) {
+      return {
+        type: 'seize',
+        turn: this.currentTurn,
+        actor: seize.unit.nid,
+        position: clonePosition(seize.position)!,
+        heuristic: seize.score,
+      };
+    }
+    const attack = this.findBestAttack(active);
+    if (attack) {
+      return {
+        type: 'attack',
+        turn: this.currentTurn,
+        actor: attack.unit.nid,
+        target: attack.target.nid,
+        item: attack.item.nid,
+        itemIndex: attack.unit.items.indexOf(attack.item),
+        position: clonePosition(attack.position)!,
+        heuristic: attack.score,
+      };
+    }
+    const heal = this.findBestHeal(active);
+    if (heal && heal.score > 0) {
+      return {
+        type: 'heal',
+        turn: this.currentTurn,
+        actor: heal.unit.nid,
+        target: heal.target.nid,
+        item: heal.item.nid,
+        itemIndex: heal.unit.items.indexOf(heal.item),
+        position: clonePosition(heal.position)!,
+        heuristic: heal.score,
+      };
+    }
+    const move = this.findBestMove(active);
+    if (move) {
+      return {
+        type: 'move',
+        turn: this.currentTurn,
+        actor: move.unit.nid,
+        position: clonePosition(move.position)!,
+        heuristic: move.score,
+      };
+    }
+    const unit = active[0];
+    return {
+      type: 'wait',
+      turn: this.currentTurn,
+      actor: unit.nid,
+      position: clonePosition(unit.position)!,
+      heuristic: -1,
+    };
+  }
+
   /** Apply one action previously returned by enumerateLegalActions. */
   applyPlayerAction(action: PlannerAction): void {
     if (!this.playerPhasePrepared || this.currentPhase !== 'player') {
       throw new Error('Player turn has not been prepared');
+    }
+    if (action.turn !== this.currentTurn) {
+      throw new Error(`Action turn ${action.turn} does not match simulator turn ${this.currentTurn}`);
     }
     const unit = this.units.get(action.actor);
     if (!unit?.position || unit.isDead() || unit.finished || unit.team !== 'player') {
@@ -580,7 +662,7 @@ export class TacticalSimulator {
   /** Canonical cache key including the RNG stream and cumulative objective cost. */
   getTranspositionKey(): string {
     const checkpoint = this.createCheckpoint(false);
-    return JSON.stringify(checkpoint);
+    return createHash('sha256').update(JSON.stringify(checkpoint)).digest('base64url');
   }
 
   getAsciiMap(): string {

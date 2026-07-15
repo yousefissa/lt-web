@@ -2,6 +2,7 @@
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { beamSearchFixedSeed, replayPlannedSolution } from './beam-search';
 import { loadSolverProject } from './project-loader';
 import { searchPolicyParallel, searchSeedRangeParallel } from './parallel-search';
 import { compareResults, searchPolicy, searchSeedRange } from './search';
@@ -20,6 +21,12 @@ interface CliOptions {
   searchSeed: number;
   seedRange?: [number, number];
   allowSeedSearch: boolean;
+  beamWidth: number;
+  branchLimit: number;
+  maxNodes: number;
+  maxMovesPerUnit: number;
+  maxAttacksPerUnit: number;
+  maxHealsPerUnit: number;
   outputPath?: string;
   solutionOutputPath?: string;
   htmlPath?: string;
@@ -57,7 +64,9 @@ async function main(): Promise<void> {
     const saved = JSON.parse(await readFile(path.resolve(options.solutionPath), 'utf8')) as SolverResult;
     assertFixedSeed(scenario.seed, saved.seed, options);
     if (options.allowSeedSearch) scenario.seed = saved.seed;
-    const rerun = new TacticalSimulator(db, scenario, saved.policy).run();
+    const rerun = saved.plan
+      ? replayPlannedSolution(db, scenario, saved.policy, saved.plan)
+      : new TacticalSimulator(db, scenario, saved.policy).run();
     const matches = compareResults(rerun, saved) === 0 && JSON.stringify(rerun.metrics) === JSON.stringify(saved.metrics);
     console.log(formatSummary(rerun));
     if (!matches) throw new Error(`Verification mismatch: saved [${saved.score}] rerun [${rerun.score}]`);
@@ -66,7 +75,39 @@ async function main(): Promise<void> {
   }
 
   let result: SolverResult;
-  if (options.command === 'solve') {
+  if (options.command === 'plan') {
+    if (options.allowSeedSearch || options.seedRange) {
+      throw new Error('plan searches actions for exactly one fixed seed; seed search is not supported');
+    }
+    let startingPolicy: PolicyWeights = DEFAULT_POLICY;
+    if (options.solutionPath) {
+      const saved = JSON.parse(await readFile(path.resolve(options.solutionPath), 'utf8')) as SolverResult;
+      assertFixedSeed(scenario.seed, saved.seed, options);
+      startingPolicy = saved.policy;
+    }
+    let reportedTurn = 0;
+    const planned = beamSearchFixedSeed(db, scenario, startingPolicy, {
+      beamWidth: options.beamWidth,
+      branchLimit: options.branchLimit,
+      maxNodes: options.maxNodes,
+      maxMovesPerUnit: options.maxMovesPerUnit,
+      maxAttacksPerUnit: options.maxAttacksPerUnit,
+      maxHealsPerUnit: options.maxHealsPerUnit,
+      onProgress: (stats, incumbent) => {
+        if (stats.deepestTurn <= reportedTurn) return;
+        reportedTurn = stats.deepestTurn;
+        console.error(
+          `beam turn ${stats.deepestTurn}: generated=${stats.nodesGenerated} cache=${stats.cacheHits} `
+          + `incumbent=[${incumbent.score.join(', ')}] source=${stats.incumbentSource}`,
+        );
+      },
+    });
+    result = planned.result;
+    console.error(
+      `beam complete: ${planned.stats.nodesGenerated} nodes, ${planned.stats.cacheHits} cache hits, `
+      + `peak ${planned.stats.frontierPeak}, incumbent ${planned.stats.incumbentSource}`,
+    );
+  } else if (options.command === 'solve') {
     let startingPolicy: PolicyWeights = DEFAULT_POLICY;
     if (options.solutionPath) {
       const saved = JSON.parse(await readFile(path.resolve(options.solutionPath), 'utf8')) as SolverResult;
@@ -136,6 +177,12 @@ function parseArgs(args: string[]): CliOptions {
     workers: 1,
     searchSeed: 1,
     allowSeedSearch: false,
+    beamWidth: 32,
+    branchLimit: 12,
+    maxNodes: 30_000,
+    maxMovesPerUnit: 4,
+    maxAttacksPerUnit: 4,
+    maxHealsPerUnit: 2,
     json: false,
   };
   for (let index = 0; index < args.length; index++) {
@@ -150,6 +197,12 @@ function parseArgs(args: string[]): CliOptions {
     else if (arg === '--search-seed') { options.searchSeed = Number(required(value, arg)); index++; }
     else if (arg === '--seed-range') { options.seedRange = parseRange(required(value, arg)); index++; }
     else if (arg === '--allow-seed-search') options.allowSeedSearch = true;
+    else if (arg === '--beam-width') { options.beamWidth = Number(required(value, arg)); index++; }
+    else if (arg === '--branch-limit') { options.branchLimit = Number(required(value, arg)); index++; }
+    else if (arg === '--max-nodes') { options.maxNodes = Number(required(value, arg)); index++; }
+    else if (arg === '--max-moves-per-unit') { options.maxMovesPerUnit = Number(required(value, arg)); index++; }
+    else if (arg === '--max-attacks-per-unit') { options.maxAttacksPerUnit = Number(required(value, arg)); index++; }
+    else if (arg === '--max-heals-per-unit') { options.maxHealsPerUnit = Number(required(value, arg)); index++; }
     else if (arg === '--out') { options.outputPath = required(value, arg); index++; }
     else if (arg === '--solution-out') { options.solutionOutputPath = required(value, arg); index++; }
     else if (arg === '--html') { options.htmlPath = required(value, arg); index++; }
@@ -218,6 +271,8 @@ async function writeSolution(filename: string, result: SolverResult): Promise<vo
     policy: result.policy,
     metrics: result.metrics,
     score: result.score,
+    plan: result.plan,
+    planner: result.planner,
   };
   await writeFile(resolved, `${JSON.stringify(compact, null, 2)}\n`, 'utf8');
 }
@@ -238,6 +293,8 @@ function printHelp(): void {
   console.log(`Fire Emblem level solver\n\n` +
     `  npm run solver -- inspect [--scenario FILE] [--project PATH]\n` +
     `  npm run solver -- run [--seed N] [--out FILE] [--html FILE] [--json]\n` +
+    `  npm run solver -- plan --scenario FILE [--solution FILE] [--beam-width N] [--branch-limit N]\n` +
+    `                         [--max-nodes N] [--solution-out FILE] [--html FILE]\n` +
     `  npm run solver -- solve [--iterations N] [--workers N] [--solution FILE] [--solution-out FILE] [--html FILE] [--fragment FILE]\n` +
     `  npm run solver -- verify --solution FILE\n\n` +
     `The scenario seed is a fixed benchmark input. Non-benchmark RNG diagnostics require both --seed-range A:B and --allow-seed-search.`);

@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { beamSearchFixedSeed, replayPlannedSolution, runGreedyPlannedSolution } from './beam-search';
 import { loadSolverProject } from './project-loader';
 import { searchSeedRangeParallel } from './parallel-search';
 import { searchSeedRange } from './search';
 import { TacticalSimulator } from './simulator';
-import type { PolicyWeights, SolverMetrics, SolverScenario } from './types';
+import type { PlannerAction, PolicyWeights, SolverMetrics, SolverScenario } from './types';
 
 const projectPath = 'lt-maker/default.ltproj';
 const scenarioPath = 'solver/scenarios/chapter-3.json';
@@ -38,10 +39,13 @@ test('saved Chapter 4 solution replays the event-derived rout exactly', {
     policy: PolicyWeights;
     metrics: SolverMetrics;
     score: number[];
+    plan?: PlannerAction[];
   };
   assert.equal(saved.seed, scenario.seed);
   const { db } = await loadSolverProject(projectPath);
-  const result = new TacticalSimulator(db, scenario, saved.policy).run();
+  const result = saved.plan
+    ? replayPlannedSolution(db, scenario, saved.policy, saved.plan)
+    : new TacticalSimulator(db, scenario, saved.policy).run();
 
   assert.deepEqual(result.score, saved.score);
   assert.deepEqual(result.metrics, saved.metrics);
@@ -113,4 +117,46 @@ test('planner checkpoints clone exact RNG, unit, inventory, and turn state', {
   assert.equal(clone.getTranspositionKey(), simulator.getTranspositionKey());
   assert.deepEqual(clone.getResult().metrics, simulator.getResult().metrics);
   assert.deepEqual(clone.getResult().finalUnits, simulator.getResult().finalUnits);
+});
+
+test('explicit fixed-seed greedy plan matches and replays the legacy Chapter 4 incumbent', {
+  skip: !existsSync(projectPath),
+}, async () => {
+  const scenario = JSON.parse(await readFile('solver/scenarios/chapter-4.json', 'utf8')) as SolverScenario;
+  const saved = JSON.parse(await readFile('solver/solutions/chapter-4.json', 'utf8')) as {
+    policy: PolicyWeights;
+  };
+  const { db } = await loadSolverProject(projectPath);
+  const legacy = new TacticalSimulator(db, scenario, saved.policy).run();
+  const planned = runGreedyPlannedSolution(db, scenario, saved.policy);
+  const replayed = replayPlannedSolution(db, scenario, saved.policy, planned.plan!);
+
+  assert.ok(planned.plan && planned.plan.length > 0);
+  assert.deepEqual(planned.score, legacy.score);
+  assert.deepEqual(planned.metrics, legacy.metrics);
+  assert.deepEqual(replayed.score, planned.score);
+  assert.deepEqual(replayed.metrics, planned.metrics);
+  assert.deepEqual(replayed.finalUnits, planned.finalUnits);
+});
+
+test('beam search remains on the scenario seed and returns a replayable incumbent', {
+  skip: !existsSync(projectPath),
+}, async () => {
+  const scenario = JSON.parse(await readFile(scenarioPath, 'utf8')) as SolverScenario;
+  const { db } = await loadSolverProject(projectPath);
+  const searched = beamSearchFixedSeed(db, scenario, undefined, {
+    beamWidth: 4,
+    branchLimit: 4,
+    maxNodes: 40,
+    maxMovesPerUnit: 1,
+    maxAttacksPerUnit: 1,
+    maxHealsPerUnit: 1,
+  });
+
+  assert.equal(searched.result.seed, scenario.seed);
+  assert.equal(searched.result.metrics.cleared, true);
+  assert.ok(searched.result.plan && searched.result.plan.length > 0);
+  const replayed = replayPlannedSolution(db, scenario, searched.result.policy, searched.result.plan!);
+  assert.deepEqual(replayed.score, searched.result.score);
+  assert.deepEqual(replayed.metrics, searched.result.metrics);
 });

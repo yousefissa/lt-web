@@ -438,9 +438,11 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
 - **Event adapter**: Infers seize/rout objectives and applies common level-start
   unit/group/stat/tag/scripted-combat effects plus turn/region group reinforcements
 - **Search**: Deterministic fixed-seed hill climbing with multi-core policy
-  shards; lexicographic scoring requires a clear before deaths, damage, turns,
-  and action count are minimized; policies include scenario-derived unit bias
-  and per-unit risk dimensions. Seed scans are gated as non-benchmark diagnostics.
+  shards plus action-level beam search with bounded per-actor branching,
+  objective/damage frontier diversity, protected incumbent prefixes, and a
+  SHA-256 transposition cache. Lexicographic scoring requires a clear before
+  deaths, damage, turns, and action count are minimized. Seed scans are gated as
+  non-benchmark diagnostics.
 - **Planner state**: Versioned checkpoints and independent clones preserve RNG,
   turn/event lifecycle, metrics, unit flags/stats/positions, inventories/uses,
   and replay state. Legal player actions are enumerable and validated one at a
@@ -449,9 +451,10 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
   interactive grid animation
 - **Chapter 3 result**: Canonical fixed seed 3 route clears in 6 turns with zero
   deaths and 19 damage; this is best-found, not a proof of turn optimality
-- **Chapter 4 result**: Canonical fixed seed 4 route clears the event-derived
-  rout objective in 5 turns with zero deaths and 22 damage, including Turn 2
-  and lower-map trigger reinforcements.
+- **Chapter 4 result**: Canonical fixed seed 4 explicit plan clears the
+  event-derived rout objective in 5 turns/82 total actions with zero deaths and
+  22 damage, including Turn 2 and lower-map trigger reinforcements. Two
+  80,000-node beam configurations did not find sub-22; this is not a proof.
 
 ---
 
@@ -556,6 +559,7 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
 | `project-loader.ts` | Filesystem `.ltproj` adapter for the engine database |
 | `event-adapter.ts` | Objective inference and standard LT event effect derivation |
 | `simulator.ts` | Fast tactical runner, cloneable checkpoints, legal actions, deterministic phase stepping, policy evaluation, and replay capture |
+| `beam-search.ts` | Fixed-seed action beam, incumbent protection, transposition cache, and explicit plan replay |
 | `search.ts` | Seed scans, policy mutation, hill climbing, result ordering |
 | `parallel-search.ts` / `worker.ts` | Multi-core search sharding |
 | `visualize.ts` | Standalone and Codex-inline replay renderers |

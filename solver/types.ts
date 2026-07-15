@@ -131,6 +131,9 @@ export interface SolverResult {
   replay: ReplayStep[];
   finalUnits: UnitSnapshot[];
   elapsedMs: number;
+  /** Explicit action route for planner-produced solutions. */
+  plan?: PlannerAction[];
+  planner?: BeamSearchStats;
 }
 
 export type PlannerActionType = 'attack' | 'heal' | 'move' | 'wait' | 'seize';
@@ -138,6 +141,7 @@ export type PlannerActionType = 'attack' | 'heal' | 'move' | 'wait' | 'seize';
 /** A fully specified, deterministic player action emitted by the simulator. */
 export interface PlannerAction {
   type: PlannerActionType;
+  turn: number;
   actor: string;
   position: Position;
   target?: string;
@@ -209,6 +213,31 @@ export interface TacticalCheckpoint {
   firedEventRules: string[];
   units: TacticalUnitCheckpoint[];
   replay?: ReplayStep[];
+}
+
+export interface BeamSearchOptions extends LegalActionOptions {
+  beamWidth: number;
+  branchLimit: number;
+  maxNodes: number;
+  onProgress?: (stats: BeamSearchStats, incumbent: SolverResult) => void;
+}
+
+export interface BeamSearchStats {
+  beamWidth: number;
+  branchLimit: number;
+  maxNodes: number;
+  nodesGenerated: number;
+  nodesAccepted: number;
+  cacheHits: number;
+  frontierPeak: number;
+  deepestTurn: number;
+  incumbentSource: 'greedy' | 'beam';
+  elapsedMs: number;
+}
+
+export interface BeamSearchResult {
+  result: SolverResult;
+  stats: BeamSearchStats;
 }
 
 export interface SearchOptions {

@@ -62,8 +62,10 @@ game loop is **replaced** with a programmatic API exposed on `window.__harness`:
 ### Headless Solver Tests
 
 The solver test suite covers seeded RNG, deterministic Chapter 3 and Chapter 4
-clears, standard event derivation, magic-damage parity, and parallel seed-search
-equivalence through the real database, pathfinding, enemy AI, and combat systems:
+clears, exact checkpoint cloning, legal action application, explicit plan replay,
+fixed-seed beam search, standard event derivation, magic-damage parity, and
+parallel diagnostic seed-search equivalence through the real database,
+pathfinding, enemy AI, and combat systems:
 
 ```bash
 npm run solver:test
@@ -80,7 +82,14 @@ the scenario seed fixed:
 ```bash
 npm run solver -- solve --scenario solver/scenarios/chapter-4.json \
   --iterations 1000 --workers 4
+npm run solver -- plan --scenario solver/scenarios/chapter-4.json \
+  --solution solver/solutions/chapter-4.json --beam-width 32 \
+  --branch-limit 12 --max-nodes 30000
 ```
+
+`plan` never scans gameplay seeds. It branches over validated player actions,
+restores exact RNG-bearing checkpoints, rejects transpositions by a canonical
+state digest, and verifies saved routes by replaying the explicit action list.
 
 ### Sacred Stones Reliability Soak
 
