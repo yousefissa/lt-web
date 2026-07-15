@@ -8,8 +8,8 @@ Lex Talionis Python/Pygame engine.
 
 ## Current State
 
-**88 engine source files, ~46,500 lines of TypeScript, plus 10 solver files
-(~1,800 lines).**
+**88 engine source files, ~46,500 lines of TypeScript, plus 12 solver files
+(~2,400 lines).**
 Builds cleanly with zero type errors. All four development phases (Foundation,
 Playable, Visual Polish, Mobile/Distribution) are complete. The engine loads
 `.ltproj` game data over HTTP and runs at 60 fps on Canvas 2D with dynamic
@@ -38,6 +38,11 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 ---
 
 ### Known Bugs
+
+- [x] **Magic weapons used the physical `DAMAGE` equation.** *(Fixed)*
+  `combat-calcs.ts` now maps the serialized `magic` component to
+  `MAGIC_DAMAGE`/`MAGIC_DEFENSE`, while `magic_at_range` remains physical at
+  melee and performs its dynamic formula swap only beyond range 1.
 
 - [x] **Settings `Text Speed` had no effect on dialogue typing.** *(Fixed)*
   `EventState` now passes `_setting_text_speed` into `Dialog`, and dialog typing
@@ -105,6 +110,20 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
   resolves, matching Python's synchronous behavior and preventing async race frames.
 
 ### Recent Changes
+
+- **Generalized objectives/events + Chapter 4 rout solution:**
+  - Added automatic seize/rout/defeat-boss objective inference and rout-aware
+    progress, completion, and incomplete-run scoring.
+  - Added a standard LT event adapter for level-start unit/group placement,
+    stat/tag changes, scripted combat, and turn/region group reinforcements.
+  - Added scenario-derived unit policy dimensions and per-unit risk multipliers.
+  - Parallelized seed-range scanning across worker threads in addition to policy
+    hill climbing, with regression coverage against the sequential result.
+  - Added `chapter-4.json` plus verified fixed-seed and seed-selected solutions:
+    seed 211 clears in 5 turns with 0 deaths/17 damage; fixed seed 4 clears in
+    5 turns with 0 deaths/22 damage.
+  - Added Chapter 4 adapter/integration tests and fixed magic-equation parity
+    discovered through Artur's intro combat.
 
 - **Deterministic headless level solver + Chapter 3 zero-damage solution:**
   - Added `solver/` CLI that directly loads `.ltproj` JSON and reuses engine

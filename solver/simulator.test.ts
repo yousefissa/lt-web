@@ -3,6 +3,8 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { loadSolverProject } from './project-loader';
+import { searchSeedRangeParallel } from './parallel-search';
+import { searchSeedRange } from './search';
 import { TacticalSimulator } from './simulator';
 import type { PolicyWeights, SolverMetrics, SolverScenario } from './types';
 
@@ -25,6 +27,43 @@ test('Chapter 3 baseline clears deterministically through real engine systems', 
     first.replay.map((step) => step.description),
     second.replay.map((step) => step.description),
   );
+});
+
+test('saved Chapter 4 solution replays the event-derived rout exactly', {
+  skip: !existsSync(projectPath),
+}, async () => {
+  const scenario = JSON.parse(await readFile('solver/scenarios/chapter-4.json', 'utf8')) as SolverScenario;
+  const saved = JSON.parse(await readFile('solver/solutions/chapter-4.json', 'utf8')) as {
+    seed: number;
+    policy: PolicyWeights;
+    metrics: SolverMetrics;
+    score: number[];
+  };
+  scenario.seed = saved.seed;
+  const { db } = await loadSolverProject(projectPath);
+  const result = new TacticalSimulator(db, scenario, saved.policy).run();
+
+  assert.deepEqual(result.score, saved.score);
+  assert.deepEqual(result.metrics, saved.metrics);
+  assert.equal(result.objective, 'rout');
+  assert.equal(result.metrics.playerDeaths, 0);
+  assert.equal(result.metrics.enemiesDefeated + result.metrics.wallsBroken, 23);
+});
+
+test('parallel seed search matches sequential seed search', {
+  skip: !existsSync(projectPath),
+}, async () => {
+  const scenario = JSON.parse(await readFile('solver/scenarios/chapter-4.json', 'utf8')) as SolverScenario;
+  const saved = JSON.parse(await readFile('solver/solutions/chapter-4.json', 'utf8')) as {
+    policy: PolicyWeights;
+  };
+  const { db } = await loadSolverProject(projectPath);
+  const sequential = searchSeedRange(db, scenario, 0, 7, saved.policy);
+  const parallel = await searchSeedRangeParallel(projectPath, scenario, saved.policy, 0, 7, 2);
+
+  assert.equal(parallel.seed, sequential.seed);
+  assert.deepEqual(parallel.score, sequential.score);
+  assert.deepEqual(parallel.metrics, sequential.metrics);
 });
 
 test('saved Chapter 3 seed-selected solution remains a zero-damage clear', {

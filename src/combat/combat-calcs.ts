@@ -251,10 +251,10 @@ function resolveEquation(
 // ------------------------------------------------------------------
 
 export function isMagic(item: ItemObject): boolean {
-  // LT convention: if the weapon has a "magic" or "magic_at_range"
-  // component it deals magic damage.  Also check weapon_type for
-  // known magical types.
-  if (item.hasComponent('magic') || item.hasComponent('magic_at_range')) {
+  // LT's `magic` component replaces DAMAGE/DEFENSE with their magic
+  // equations. `magic_at_range` stays physical at melee and applies its
+  // formula swap dynamically only beyond range 1.
+  if (item.hasComponent('magic')) {
     return true;
   }
   const wtype = item.getWeaponType();
@@ -330,7 +330,7 @@ export function damage(unit: UnitObject, item: ItemObject, db: Database): number
 
   const magic = isMagic(item);
   const defaultExpr = magic ? 'MAG' : 'STR';
-  const eqName = formulaOverride ?? 'DAMAGE';
+  const eqName = formulaOverride ?? (magic ? 'MAGIC_DAMAGE' : 'DAMAGE');
   const baseDmg = resolveEquation(db, eqName, defaultExpr, unit);
   const itemDmg = item.getDamage();
 

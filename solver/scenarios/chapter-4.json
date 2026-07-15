@@ -1,0 +1,26 @@
+{
+  "name": "Sacred Stones Ch. 4: Ancient Horrors",
+  "project": "lt-maker/default.ltproj",
+  "levelNid": "4",
+  "seed": 4,
+  "rngMode": "true_hit",
+  "maxTurns": 18,
+  "objective": "auto",
+  "eventAdapter": "standard",
+  "team": {
+    "Eirika": { "level": 5, "exp": 20, "items": ["Rapier", "Vulnerary"] },
+    "Seth": { "level": 1, "exp": 30, "items": ["Steel_Sword", "Silver_Lance", "Vulnerary"] },
+    "Gilliam": { "level": 6, "exp": 20, "items": ["Iron_Lance", "Vulnerary"] },
+    "Vanessa": { "level": 4, "exp": 20, "items": ["Slim_Lance", "Javelin", "Vulnerary"] },
+    "Moulder": { "level": 5, "exp": 30, "items": ["Heal", "Vulnerary"] },
+    "Ross": { "level": 5, "exp": 50, "items": ["Hatchet", "Vulnerary"] },
+    "Colm": { "level": 3, "exp": 20, "items": ["Iron_Sword", "Lockpick", "Vulnerary"] },
+    "Neimi": { "level": 3, "exp": 20, "items": ["Iron_Bow", "Vulnerary"] },
+    "Artur": { "level": 2, "exp": 0, "items": ["Lightning", "Vulnerary"] }
+  },
+  "notes": [
+    "Fixed-growth levels approximate experience gained through Chapters 0-3.",
+    "The standard event adapter applies the intro's group placement, boss stat/tag changes, and scripted Mogall combat.",
+    "Turn 2 and lower-map trigger reinforcements are derived from level events; village visits and Lute recruitment remain optional."
+  ]
+}

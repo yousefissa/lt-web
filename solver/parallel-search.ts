@@ -2,7 +2,8 @@ import { Worker } from 'node:worker_threads';
 import { compareResults } from './search';
 import type { PolicyWeights, SolverResult, SolverScenario } from './types';
 
-interface WorkerPayload {
+interface PolicyWorkerPayload {
+  mode: 'policy';
   projectPath: string;
   scenario: SolverScenario;
   policy: PolicyWeights;
@@ -11,6 +12,17 @@ interface WorkerPayload {
   shardIndex: number;
   shardCount: number;
 }
+
+interface SeedWorkerPayload {
+  mode: 'seed';
+  projectPath: string;
+  scenario: SolverScenario;
+  policy: PolicyWeights;
+  fromSeed: number;
+  toSeed: number;
+}
+
+type WorkerPayload = PolicyWorkerPayload | SeedWorkerPayload;
 
 export async function searchPolicyParallel(
   projectPath: string,
@@ -27,6 +39,7 @@ export async function searchPolicyParallel(
 
   for (let shardIndex = 0; shardIndex < count; shardIndex++) {
     jobs.push(runWorker({
+      mode: 'policy',
       projectPath,
       scenario,
       policy,
@@ -35,6 +48,40 @@ export async function searchPolicyParallel(
       shardIndex,
       shardCount: count,
     }));
+  }
+
+  const results = await Promise.all(jobs);
+  return results.reduce((best, candidate) => compareResults(candidate, best) < 0 ? candidate : best);
+}
+
+export async function searchSeedRangeParallel(
+  projectPath: string,
+  scenario: SolverScenario,
+  policy: PolicyWeights,
+  fromSeed: number,
+  toSeed: number,
+  workerCount: number,
+): Promise<SolverResult> {
+  const start = Math.min(fromSeed, toSeed);
+  const end = Math.max(fromSeed, toSeed);
+  const total = end - start + 1;
+  const count = Math.max(1, Math.min(workerCount, total));
+  const baseSize = Math.floor(total / count);
+  const remainder = total % count;
+  const jobs: Array<Promise<SolverResult>> = [];
+  let cursor = start;
+
+  for (let shardIndex = 0; shardIndex < count; shardIndex++) {
+    const size = baseSize + (shardIndex < remainder ? 1 : 0);
+    jobs.push(runWorker({
+      mode: 'seed',
+      projectPath,
+      scenario,
+      policy,
+      fromSeed: cursor,
+      toSeed: cursor + size - 1,
+    }));
+    cursor += size;
   }
 
   const results = await Promise.all(jobs);

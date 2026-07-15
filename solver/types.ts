@@ -2,6 +2,8 @@ import type { RngMode } from '../src/combat/combat-solver';
 
 export type Position = [number, number];
 export type SolverPhase = 'player' | 'enemy' | 'other';
+export type SolverObjectiveType = 'auto' | 'seize' | 'rout' | 'defeat_boss';
+export type SolverEventAdapter = 'none' | 'standard';
 
 export interface TeamUnitConfig {
   enabled?: boolean;
@@ -27,6 +29,9 @@ export interface SolverScenario {
   seed: number;
   rngMode?: RngMode;
   maxTurns: number;
+  objective?: SolverObjectiveType;
+  bossNid?: string;
+  eventAdapter?: SolverEventAdapter;
   team: Record<string, TeamUnitConfig>;
   scriptedSpawns?: ScriptedSpawn[];
   notes?: string[];
@@ -44,6 +49,8 @@ export interface PolicyWeights {
   heal: number;
   stayHealthy: number;
   unitBias: Record<string, number>;
+  /** Per-unit multiplier on the global expected-danger penalty. Defaults to 1. */
+  unitRisk?: Record<string, number>;
 }
 
 export type SolverActionType = 'attack' | 'move' | 'wait' | 'heal' | 'seize' | 'spawn';
@@ -113,6 +120,7 @@ export interface SolverMetrics {
 export interface SolverResult {
   scenario: string;
   levelNid: string;
+  objective: Exclude<SolverObjectiveType, 'auto'>;
   seed: number;
   rngState: number;
   rngMode: RngMode;

@@ -3,7 +3,7 @@ import { SeededRandom } from '../src/engine/random';
 import { DEFAULT_POLICY, TacticalSimulator } from './simulator';
 import type { PolicyWeights, SearchOptions, SolverResult, SolverScenario } from './types';
 
-const NUMERIC_KEYS: Array<Exclude<keyof PolicyWeights, 'unitBias'>> = [
+const NUMERIC_KEYS: Array<Exclude<keyof PolicyWeights, 'unitBias' | 'unitRisk'>> = [
   'kill',
   'bossKill',
   'damage',
@@ -27,19 +27,32 @@ export function compareResults(a: SolverResult, b: SolverResult): number {
 }
 
 export function mutatePolicy(base: PolicyWeights, rng: SeededRandom, scale = 0.45): PolicyWeights {
-  const next: PolicyWeights = { ...base, unitBias: { ...base.unitBias } };
+  const next: PolicyWeights = {
+    ...base,
+    unitBias: { ...base.unitBias },
+    unitRisk: { ...(base.unitRisk ?? {}) },
+  };
   const mutationCount = 1 + Math.floor(rng.next() * 4);
 
   for (let mutation = 0; mutation < mutationCount; mutation++) {
-    if (rng.next() < 0.75) {
+    const mutationType = rng.next();
+    if (mutationType < 0.65) {
       const key = NUMERIC_KEYS[Math.floor(rng.next() * NUMERIC_KEYS.length)];
       const factor = Math.exp((rng.next() * 2 - 1) * scale);
       next[key] = Math.max(0.001, Math.min(5000, next[key] * factor));
-    } else {
+    } else if (mutationType < 0.83) {
       const units = Object.keys(next.unitBias);
       if (units.length > 0) {
         const unit = units[Math.floor(rng.next() * units.length)];
         next.unitBias[unit] = Math.max(-100, Math.min(100, (next.unitBias[unit] ?? 0) + (rng.next() * 2 - 1) * 12));
+      }
+    } else {
+      const unitRisk = next.unitRisk ?? {};
+      const units = Object.keys(unitRisk);
+      if (units.length > 0) {
+        const unit = units[Math.floor(rng.next() * units.length)];
+        const factor = Math.exp((rng.next() * 2 - 1) * scale);
+        unitRisk[unit] = Math.max(0.05, Math.min(20, (unitRisk[unit] ?? 1) * factor));
       }
     }
   }
@@ -47,7 +60,11 @@ export function mutatePolicy(base: PolicyWeights, rng: SeededRandom, scale = 0.4
 }
 
 export function randomPolicy(rng: SeededRandom): PolicyWeights {
-  let policy: PolicyWeights = { ...DEFAULT_POLICY, unitBias: { ...DEFAULT_POLICY.unitBias } };
+  let policy: PolicyWeights = {
+    ...DEFAULT_POLICY,
+    unitBias: { ...DEFAULT_POLICY.unitBias },
+    unitRisk: { ...(DEFAULT_POLICY.unitRisk ?? {}) },
+  };
   for (let index = 0; index < 12; index++) policy = mutatePolicy(policy, rng, 1.1);
   return policy;
 }

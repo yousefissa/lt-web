@@ -61,20 +61,24 @@ game loop is **replaced** with a programmatic API exposed on `window.__harness`:
 
 ### Headless Solver Tests
 
-The solver test suite covers the seeded RNG and a deterministic Chapter 3 clear
-through the real database, pathfinding, enemy AI, and combat systems:
+The solver test suite covers seeded RNG, deterministic Chapter 3 and Chapter 4
+clears, standard event derivation, magic-damage parity, and parallel seed-search
+equivalence through the real database, pathfinding, enemy AI, and combat systems:
 
 ```bash
 npm run solver:test
 npm run solver:typecheck
 npm run solver -- verify --solution solver/solutions/chapter-3.json
+npm run solver -- verify --scenario solver/scenarios/chapter-4.json \
+  --solution solver/solutions/chapter-4.json
 ```
 
-The Chapter 3 integration test is skipped when `lt-maker/default.ltproj` is not
-available. Policy searches can use multiple worker threads:
+Project-backed integration tests are skipped when `lt-maker/default.ltproj` is
+not available. Policy and seed-range searches can use multiple worker threads:
 
 ```bash
-npm run solver -- solve --iterations 1000 --workers 4
+npm run solver -- solve --scenario solver/scenarios/chapter-4.json \
+  --seed-range 0:1023 --iterations 1000 --workers 4
 ```
 
 ### Sacred Stones Reliability Soak

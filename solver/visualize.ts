@@ -157,6 +157,7 @@ export function renderReplayFragment(result: SolverResult): string {
   const compact = {
     map: result.map,
     metrics: result.metrics,
+    objective: result.objective,
     seed: result.seed,
     rngMode: result.rngMode,
     steps: result.replay.map((step) => ({
@@ -183,7 +184,7 @@ export function renderReplayFragment(result: SolverResult): string {
     <div class="card viz-stat"><span class="text-muted">Turns</span><span class="viz-stat-value">${result.metrics.turns}</span></div>
     <div class="card viz-stat"><span class="text-muted">Player deaths</span><span class="viz-stat-value">${result.metrics.playerDeaths}</span></div>
   </div>
-  <canvas id="fe-replay-map" role="img" aria-label="Animated grid replay of the Chapter 3 solver route">Chapter 3 solver replay</canvas>
+  <canvas id="fe-replay-map" role="img" aria-label="Animated grid replay of ${escapeHtml(result.scenario)}">${escapeHtml(result.scenario)} replay</canvas>
   <div class="viz-controls" aria-label="Replay controls">
     <button type="button" class="btn btn-ghost" id="fe-replay-prev" aria-label="Previous step">Previous</button>
     <button type="button" class="btn btn-primary" id="fe-replay-play" aria-pressed="false">Play</button>
@@ -196,7 +197,7 @@ export function renderReplayFragment(result: SolverResult): string {
     <span><i class="fe-key fe-player" aria-hidden="true"></i>Player</span>
     <span><i class="fe-key fe-enemy" aria-hidden="true"></i>Enemy</span>
     <span><i class="fe-key fe-other" aria-hidden="true"></i>Other</span>
-    <span><i class="fe-key fe-seize" aria-hidden="true"></i>Seize tile</span>
+    ${result.objective === 'seize' ? '<span><i class="fe-key fe-seize" aria-hidden="true"></i>Seize tile</span>' : ''}
   </div>
 </div>
 <style>

@@ -26,6 +26,16 @@ import { ItemObject } from '../src/objects/item';
 import { SkillObject } from '../src/objects/skill';
 import { UnitObject } from '../src/objects/unit';
 import { PathSystem } from '../src/pathfinding/path-system';
+import {
+  buildStandardEventPlan,
+  findRegion,
+  getGroup,
+  inferObjectiveType,
+  parsePosition,
+  resolveGroupPosition,
+  type EventGroupSpawnRule,
+  type ParsedEventCommand,
+} from './event-adapter';
 import type {
   MapSnapshot,
   PolicyWeights,
@@ -33,6 +43,7 @@ import type {
   ReplayStep,
   SolverActionType,
   SolverMetrics,
+  SolverObjectiveType,
   SolverPhase,
   SolverResult,
   SolverScenario,
@@ -83,6 +94,7 @@ export const DEFAULT_POLICY: PolicyWeights = {
     Neimi: -1,
     Moulder: -8,
   },
+  unitRisk: {},
 };
 
 function isGenericUnit(data: UniqueUnitData | GenericUnitData): data is GenericUnitData {
@@ -125,7 +137,11 @@ function fixedLevelGains(
 }
 
 function copyPolicy(policy: PolicyWeights): PolicyWeights {
-  return { ...policy, unitBias: { ...policy.unitBias } };
+  return {
+    ...policy,
+    unitBias: { ...policy.unitBias },
+    unitRisk: { ...(policy.unitRisk ?? {}) },
+  };
 }
 
 export class TacticalSimulator {
@@ -138,6 +154,7 @@ export class TacticalSimulator {
   readonly pathSystem: PathSystem;
   readonly rng: SeededRandom;
   readonly rngMode: RngMode;
+  readonly objectiveType: Exclude<SolverObjectiveType, 'auto'>;
 
   private aiController: AIController;
   private combatSolver: CombatPhaseSolver;
@@ -151,11 +168,17 @@ export class TacticalSimulator {
   private cleared: boolean;
   private lost: boolean;
   private dangerMoveCache: Map<string, Position[]>;
+  private eventSpawnRules: EventGroupSpawnRule[];
+  private firedEventRules: Set<string>;
 
   constructor(db: Database, scenario: SolverScenario, policy: PolicyWeights = DEFAULT_POLICY) {
     this.db = db;
     this.scenario = structuredClone(scenario);
     this.policy = copyPolicy(policy);
+    for (const nid of Object.keys(scenario.team)) {
+      if (this.policy.unitBias[nid] === undefined) this.policy.unitBias[nid] = 0;
+      if (this.policy.unitRisk![nid] === undefined) this.policy.unitRisk![nid] = 1;
+    }
 
     const level = db.levels.get(scenario.levelNid);
     if (!level) throw new Error(`Unknown level NID: ${scenario.levelNid}`);
@@ -170,6 +193,8 @@ export class TacticalSimulator {
     this.rng = new SeededRandom(scenario.seed);
     this.rngMode = scenario.rngMode ?? 'true_hit';
     this.combatSolver = new CombatPhaseSolver(() => this.rng.next());
+    const eventPlan = buildStandardEventPlan(db, level);
+    this.objectiveType = inferObjectiveType(level, eventPlan.events, scenario.objective);
     this.units = new Map();
     this.replay = [];
     this.currentTurn = 1;
@@ -177,9 +202,12 @@ export class TacticalSimulator {
     this.cleared = false;
     this.lost = false;
     this.dangerMoveCache = new Map();
+    this.eventSpawnRules = scenario.eventAdapter === 'standard' ? eventPlan.spawnRules : [];
+    this.firedEventRules = new Set();
 
     this.seizePosition = this.findSeizePosition();
     this.spawnInitialUnits();
+    if (scenario.eventAdapter === 'standard') this.applyInitialEventCommands(eventPlan.initialCommands);
 
     this.aiController = new AIController(db, this.board, this.pathSystem);
     this.aiController.gameRef = {
@@ -216,9 +244,13 @@ export class TacticalSimulator {
       this.currentTurn = turn;
       this.metrics.turns = turn;
 
+      this.currentPhase = 'player';
+      this.runEventSpawns();
+      this.runScriptedSpawns('player');
       this.runPlayerPhase();
       if (this.cleared || this.lost) break;
 
+      this.runScriptedSpawns('enemy');
       this.runAiPhase('enemy');
       if (this.cleared || this.lost) break;
 
@@ -234,13 +266,14 @@ export class TacticalSimulator {
       .filter((unit) => !unit.isDead())
       .reduce((sum, unit) => sum + unit.currentHp, 0);
     this.metrics.remainingEnemyHp = this.enemyUnits()
-      .filter((unit) => !unit.isDead() && !this.isWall(unit))
+      .filter((unit) => unit.position && !unit.isDead())
       .reduce((sum, unit) => sum + unit.currentHp, 0);
 
     const score = this.buildScore();
     return {
       scenario: this.scenario.name,
       levelNid: this.scenario.levelNid,
+      objective: this.objectiveType,
       seed: this.scenario.seed,
       rngState: this.rng.getState(),
       rngMode: this.rngMode,
@@ -306,6 +339,118 @@ export class TacticalSimulator {
       if (data.team === 'player' && this.scenario.team[data.nid]?.enabled === false) continue;
       if (!data.starting_position) continue;
       this.spawnLevelUnit(data, data.team, data.starting_position);
+    }
+  }
+
+  private applyInitialEventCommands(commands: ParsedEventCommand[]): void {
+    for (const command of commands) {
+      const [first, second, third] = command.args;
+      if (command.nid === 'remove_unit') this.removeInitialUnit(first);
+      else if (command.nid === 'kill_unit') this.removeInitialUnit(first, true);
+      else if (command.nid === 'add_unit') this.placeUnit(first, parsePosition(second), true);
+      else if (command.nid === 'move_unit') this.placeUnit(first, parsePosition(second), false);
+      else if (command.nid === 'remove_group') this.removeGroup(first);
+      else if (command.nid === 'add_group') this.placeGroup(first, second, true, false);
+      else if (command.nid === 'spawn_group') this.placeGroup(first, third, true, false);
+      else if (command.nid === 'move_group') this.placeGroup(first, second, false, false);
+      else if (command.nid === 'set_stats') this.setInitialStats(first, second);
+      else if (command.nid === 'add_tag') this.addInitialTag(first, second);
+      else if (command.nid === 'interact_unit') this.applyInitialScriptedCombat(first, second, third);
+    }
+  }
+
+  private removeInitialUnit(nid: string, dead = false): void {
+    const unit = this.units.get(nid);
+    if (!unit) return;
+    this.board.removeUnit(unit);
+    if (dead) {
+      unit.dead = true;
+      unit.currentHp = 0;
+    }
+  }
+
+  private removeGroup(groupNid: string): void {
+    const group = getGroup(this.level, groupNid);
+    if (!group) return;
+    for (const nid of group.units) this.removeInitialUnit(nid);
+  }
+
+  private placeUnit(nid: string, requested: Position | null, allowSpawn: boolean): UnitObject | null {
+    const data = this.level.units.find((candidate) => candidate.nid === nid);
+    if (!data) return null;
+    if (data.team === 'player' && this.scenario.team[nid]?.enabled === false) return null;
+    const position = requested ?? clonePosition(data.starting_position);
+    if (!position) return null;
+
+    let unit = this.units.get(nid) ?? null;
+    if (!unit && allowSpawn) unit = this.spawnLevelUnit(data, data.team, null);
+    if (!unit || unit.isDead()) return null;
+    const occupant = this.board.getUnit(position[0], position[1]);
+    if (occupant && occupant !== unit) return null;
+    if (unit.position) this.board.moveUnit(unit, position[0], position[1]);
+    else this.board.setUnit(position[0], position[1], unit);
+    return unit;
+  }
+
+  private placeGroup(
+    groupNid: string,
+    startingGroup: string | undefined,
+    allowSpawn: boolean,
+    recordSpawn: boolean,
+  ): void {
+    const group = getGroup(this.level, groupNid);
+    if (!group) return;
+    for (const nid of group.units) {
+      const position = resolveGroupPosition(this.level, group, nid, startingGroup);
+      if (!position) continue;
+      const wasOnMap = !!this.units.get(nid)?.position;
+      const unit = this.placeUnit(nid, position, allowSpawn);
+      if (recordSpawn && unit && !wasOnMap) {
+        this.recordStep('spawn', `${unit.name} enters the map`, unit, unit.position);
+      }
+    }
+  }
+
+  private setInitialStats(nid: string, encoded: string): void {
+    const unit = this.units.get(nid);
+    if (!unit) return;
+    const values = encoded.split(',').map((value) => value.trim());
+    for (let index = 0; index + 1 < values.length; index += 2) {
+      const value = Number(values[index + 1]);
+      if (values[index] && Number.isFinite(value)) unit.stats[values[index]] = value;
+    }
+    unit.currentHp = unit.maxHp;
+  }
+
+  private addInitialTag(nid: string, tag: string): void {
+    const unit = this.units.get(nid);
+    if (unit && tag && !unit.tags.includes(tag)) unit.tags.push(tag);
+  }
+
+  private applyInitialScriptedCombat(attackerNid: string, targetValue: string, encodedScript: string): void {
+    const attacker = this.units.get(attackerNid);
+    const targetPosition = parsePosition(targetValue);
+    const defender = targetPosition
+      ? this.board.getUnit(targetPosition[0], targetPosition[1])
+      : this.units.get(targetValue);
+    const attackItem = attacker?.items.find((item) => item.isWeapon() && item.hasUsesRemaining());
+    if (!attacker || !defender || !attackItem || !encodedScript) return;
+    const defenseItem = defender.items.find((item) => item.isWeapon() && item.hasUsesRemaining()) ?? null;
+    const strikes = this.combatSolver.resolve(
+      attacker,
+      attackItem,
+      defender,
+      defenseItem,
+      this.db,
+      this.rngMode,
+      this.board,
+      encodedScript.split(',').map((token) => token.trim()),
+    );
+    for (const strike of strikes) {
+      strike.item.decrementUses();
+      if (!strike.hit || strike.defender.isDead()) continue;
+      strike.defender.currentHp = Math.max(0, strike.defender.currentHp - strike.damage);
+      if (strike.defender.currentHp <= 0) this.removeInitialUnit(strike.defender.nid, true);
     }
   }
 
@@ -455,6 +600,28 @@ export class TacticalSimulator {
     }
   }
 
+  private runEventSpawns(): void {
+    for (const rule of this.eventSpawnRules) {
+      if (this.firedEventRules.has(rule.id) || !this.eventSpawnRuleMatches(rule)) continue;
+      this.firedEventRules.add(rule.id);
+      this.placeGroup(rule.groupNid, rule.startingGroup, true, true);
+    }
+  }
+
+  private eventSpawnRuleMatches(rule: EventGroupSpawnRule): boolean {
+    if (rule.trigger.type === 'turn') return this.currentTurn === rule.trigger.turn;
+    const region = findRegion(this.level, rule.trigger.regionNid);
+    if (!region) return false;
+    return this.playerUnits().some((unit) => {
+      if (!unit.position || unit.isDead()) return false;
+      const [x, y] = unit.position;
+      return x >= region.position[0]
+        && y >= region.position[1]
+        && x < region.position[0] + region.size[0]
+        && y < region.position[1] + region.size[1];
+    });
+  }
+
   private runScriptedSpawns(phase: SolverPhase): void {
     const spawns = (this.scenario.scriptedSpawns ?? []).filter(
       (spawn) => spawn.turn === this.currentTurn && spawn.phase === phase && !this.units.has(spawn.unitNid),
@@ -502,7 +669,7 @@ export class TacticalSimulator {
   }
 
   private findSeizeCandidate(active: UnitObject[]): MoveCandidate | null {
-    if (!this.seizePosition || this.board.isOccupied(this.seizePosition[0], this.seizePosition[1])) return null;
+    if (this.objectiveType !== 'seize' || !this.seizePosition || this.board.isOccupied(this.seizePosition[0], this.seizePosition[1])) return null;
     for (const unit of active) {
       if (!unit.tags.includes('Lord')) continue;
       const valid = this.pathSystem.getValidMoves(unit, this.board);
@@ -551,7 +718,7 @@ export class TacticalSimulator {
 
     let score = expected * this.policy.damage + progress * this.policy.progress;
     score -= counter * this.policy.counterDamage;
-    score -= danger * this.policy.danger;
+    score -= danger * this.policy.danger * (this.policy.unitRisk?.[unit.nid] ?? 1);
     score += this.policy.unitBias[unit.nid] ?? 0;
     score += (unit.currentHp / Math.max(1, unit.maxHp)) * this.policy.stayHealthy;
     if (canKill) score += this.policy.kill;
@@ -597,7 +764,8 @@ export class TacticalSimulator {
         this.board.moveUnit(unit, position[0], position[1]);
         const danger = this.expectedDanger(unit);
         this.board.moveUnit(unit, original[0], original[1]);
-        let score = progress * this.policy.progress - danger * this.policy.danger;
+        let score = progress * this.policy.progress
+          - danger * this.policy.danger * (this.policy.unitRisk?.[unit.nid] ?? 1);
         score += this.policy.unitBias[unit.nid] ?? 0;
         score += (unit.currentHp / Math.max(1, unit.maxHp)) * this.policy.stayHealthy;
         if (this.seizePosition && !unit.tags.includes('Lord')) {
@@ -643,6 +811,7 @@ export class TacticalSimulator {
       records,
       from,
     );
+    this.refreshOutcome();
   }
 
   private applyStrike(strike: CombatStrike): StrikeRecord {
@@ -735,8 +904,17 @@ export class TacticalSimulator {
   }
 
   private objectiveProgress(from: Position, to: Position): number {
-    if (!this.seizePosition) return 0;
-    return manhattan(from, this.seizePosition) - manhattan(to, this.seizePosition);
+    if (this.objectiveType === 'seize') {
+      if (!this.seizePosition) return 0;
+      return manhattan(from, this.seizePosition) - manhattan(to, this.seizePosition);
+    }
+    const targets = this.objectiveType === 'defeat_boss'
+      ? this.enemyUnits().filter((unit) => unit.position && !unit.isDead() && this.isBoss(unit))
+      : this.enemyUnits().filter((unit) => unit.position && !unit.isDead());
+    if (targets.length === 0) return 0;
+    const distanceFrom = Math.min(...targets.map((unit) => manhattan(from, unit.position!)));
+    const distanceTo = Math.min(...targets.map((unit) => manhattan(to, unit.position!)));
+    return distanceFrom - distanceTo;
   }
 
   private killUnit(unit: UnitObject): void {
@@ -754,23 +932,44 @@ export class TacticalSimulator {
   private refreshOutcome(): void {
     const lord = this.units.get('Eirika') ?? this.playerUnits().find((unit) => unit.tags.includes('Lord'));
     this.lost = !lord || lord.isDead();
-    if (this.seizePosition) {
+    if (this.objectiveType === 'seize' && this.seizePosition) {
       const occupant = this.board.getUnit(this.seizePosition[0], this.seizePosition[1]);
       this.cleared = !!occupant && occupant.team === 'player' && occupant.tags.includes('Lord');
+    } else if (this.objectiveType === 'rout') {
+      this.cleared = this.enemyUnits().every((unit) => !unit.position || unit.isDead());
+    } else if (this.objectiveType === 'defeat_boss') {
+      const boss = this.scenario.bossNid
+        ? this.units.get(this.scenario.bossNid)
+        : this.enemyUnits().find((unit) => this.isBoss(unit));
+      this.cleared = !!boss && boss.isDead();
     }
   }
 
   private buildScore(): number[] {
     const lord = this.units.get('Eirika') ?? this.playerUnits().find((unit) => unit.tags.includes('Lord'));
-    const lordDistance = lord?.position && this.seizePosition ? manhattan(lord.position, this.seizePosition) : 999;
     if (this.cleared) {
       return [0, this.metrics.playerDeaths, this.metrics.damageTaken, this.metrics.turns, this.metrics.actions];
     }
-    return [1, this.lost ? 1 : 0, this.metrics.playerDeaths, lordDistance, this.metrics.remainingEnemyHp, this.metrics.damageTaken];
+    let objectiveRemaining = 999;
+    if (this.objectiveType === 'seize' && lord?.position && this.seizePosition) {
+      objectiveRemaining = manhattan(lord.position, this.seizePosition);
+    } else if (this.objectiveType === 'rout') {
+      objectiveRemaining = this.enemyUnits().filter((unit) => unit.position && !unit.isDead()).length;
+    } else if (this.objectiveType === 'defeat_boss') {
+      const boss = this.scenario.bossNid
+        ? this.units.get(this.scenario.bossNid)
+        : this.enemyUnits().find((unit) => this.isBoss(unit));
+      objectiveRemaining = boss?.currentHp ?? 999;
+    }
+    return [1, this.lost ? 1 : 0, this.metrics.playerDeaths, objectiveRemaining, this.metrics.remainingEnemyHp, this.metrics.damageTaken];
   }
 
   private isWall(unit: UnitObject): boolean {
     return unit.tags.includes('Tile') || unit.klass.toLowerCase().startsWith('wall');
+  }
+
+  private isBoss(unit: UnitObject): boolean {
+    return unit.nid === this.scenario.bossNid || unit.tags.includes('Boss');
   }
 
   private playerUnits(): UnitObject[] {

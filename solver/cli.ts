@@ -3,7 +3,7 @@ import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { loadSolverProject } from './project-loader';
-import { searchPolicyParallel } from './parallel-search';
+import { searchPolicyParallel, searchSeedRangeParallel } from './parallel-search';
 import { compareResults, searchPolicy, searchSeedRange } from './search';
 import { DEFAULT_POLICY, TacticalSimulator } from './simulator';
 import type { PolicyWeights, SolverResult, SolverScenario } from './types';
@@ -73,10 +73,19 @@ async function main(): Promise<void> {
       console.error(`continuing from ${options.solutionPath}: seed ${saved.seed} score [${saved.score.join(', ')}]`);
     }
     if (options.seedRange) {
-      const seedBest = searchSeedRange(db, scenario, options.seedRange[0], options.seedRange[1], startingPolicy);
+      const seedBest = options.workers > 1
+        ? await searchSeedRangeParallel(
+          projectPath,
+          scenario,
+          startingPolicy,
+          options.seedRange[0],
+          options.seedRange[1],
+          options.workers,
+        )
+        : searchSeedRange(db, scenario, options.seedRange[0], options.seedRange[1], startingPolicy);
       scenario.seed = seedBest.seed;
       startingPolicy = seedBest.policy;
-      console.error(`seed search best: ${seedBest.seed} score [${seedBest.score.join(', ')}]`);
+      console.error(`seed search best${options.workers > 1 ? ` (${options.workers} workers)` : ''}: ${seedBest.seed} score [${seedBest.score.join(', ')}]`);
     }
     if (options.workers > 1) {
       result = await searchPolicyParallel(
@@ -185,6 +194,7 @@ async function writeSolution(filename: string, result: SolverResult): Promise<vo
   const compact = {
     scenario: result.scenario,
     levelNid: result.levelNid,
+    objective: result.objective,
     seed: result.seed,
     rngState: result.rngState,
     rngMode: result.rngMode,
@@ -199,7 +209,7 @@ function formatSummary(result: SolverResult): string {
   const metrics = result.metrics;
   return [
     `${metrics.cleared ? 'CLEAR' : metrics.lost ? 'LOSS' : 'INCOMPLETE'} — ${result.scenario}`,
-    `seed ${result.seed} (${result.rngMode}), score [${result.score.join(', ')}]`,
+    `objective ${result.objective}, seed ${result.seed} (${result.rngMode}), score [${result.score.join(', ')}]`,
     `${metrics.turns} turns, ${metrics.actions} actions, ${metrics.combats} combats`,
     `${metrics.damageTaken} damage taken, ${metrics.healingReceived} healed, ${metrics.playerDeaths} player deaths`,
     `${metrics.enemiesDefeated} enemies defeated, ${metrics.wallsBroken} walls broken`,
