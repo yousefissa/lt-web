@@ -1,0 +1,51 @@
+{
+  "scenario": "Sacred Stones Ch. 3: The Bandits of Borgo",
+  "levelNid": "3",
+  "seed": 115,
+  "rngState": 3271908259,
+  "rngMode": "true_hit",
+  "policy": {
+    "kill": 107.83304436919015,
+    "bossKill": 571.1900038388738,
+    "damage": 3.1542873583873354,
+    "counterDamage": 5.540192784433662,
+    "lethalRisk": 2203.340385824022,
+    "progress": 9.241095527410467,
+    "danger": 0.6667783569961675,
+    "wall": 441.0411168725207,
+    "heal": 3.2936407689525424,
+    "stayHealthy": 1.979833334147125,
+    "unitBias": {
+      "Seth": 33.41865610331297,
+      "Eirika": 7.065234612673521,
+      "Franz": -3.46909836307168,
+      "Gilliam": -4.560202753171325,
+      "Garcia": 33.086115662008524,
+      "Vanessa": -0.2631521224975586,
+      "Ross": 7.180540198460221,
+      "Neimi": -17.951757434755564,
+      "Moulder": 9.503749545663595
+    }
+  },
+  "metrics": {
+    "cleared": true,
+    "lost": false,
+    "turns": 6,
+    "actions": 73,
+    "combats": 25,
+    "damageTaken": 0,
+    "healingReceived": 0,
+    "playerDeaths": 0,
+    "enemiesDefeated": 10,
+    "wallsBroken": 3,
+    "remainingPlayerHp": 198,
+    "remainingEnemyHp": 0
+  },
+  "score": [
+    0,
+    0,
+    0,
+    6,
+    73
+  ]
+}

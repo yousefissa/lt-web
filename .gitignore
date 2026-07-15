@@ -35,6 +35,7 @@ twa/*.jks
 test-results/
 test-screenshots/
 test-snapshots/
+solver-output/
 
 # Editor directories and files
 .vscode/*

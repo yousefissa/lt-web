@@ -4,6 +4,7 @@ import type { Database } from '../data/database';
 import type { GameBoard } from '../objects/game-board';
 import * as calcs from './combat-calcs';
 import * as skillSystem from './skill-system';
+import { random, type RandomSource } from '../engine/random';
 
 // ============================================================
 // CombatPhaseSolver - Resolves a full combat encounter into a
@@ -29,9 +30,11 @@ export type ScriptToken = 'hit1' | 'hit2' | 'crit1' | 'crit2' | 'miss1' | 'miss2
 
 export class CombatPhaseSolver {
   private strikes: CombatStrike[];
+  private randomSource: RandomSource;
 
-  constructor() {
+  constructor(randomSource: RandomSource = random) {
     this.strikes = [];
+    this.randomSource = randomSource;
   }
 
   /**
@@ -328,21 +331,21 @@ export class CombatPhaseSolver {
         return true;
 
       case 'true_hit': {
-        const r1 = Math.floor(Math.random() * 100);
-        const r2 = Math.floor(Math.random() * 100);
+        const r1 = Math.floor(this.randomSource() * 100);
+        const r2 = Math.floor(this.randomSource() * 100);
         return (r1 + r2) / 2 < hitChance;
       }
 
       case 'true_hit_plus': {
-        const r1 = Math.floor(Math.random() * 100);
-        const r2 = Math.floor(Math.random() * 100);
-        const r3 = Math.floor(Math.random() * 100);
+        const r1 = Math.floor(this.randomSource() * 100);
+        const r2 = Math.floor(this.randomSource() * 100);
+        const r3 = Math.floor(this.randomSource() * 100);
         return (r1 + r2 + r3) / 3 < hitChance;
       }
 
       case 'classic':
       default: {
-        return Math.floor(Math.random() * 100) < hitChance;
+        return Math.floor(this.randomSource() * 100) < hitChance;
       }
     }
   }
@@ -378,7 +381,7 @@ export class CombatPhaseSolver {
     const hit = this.rollHit(finalHit, rngMode);
 
     // Roll for crit (only if hit lands)
-    const crit = hit ? Math.floor(Math.random() * 100) < critChance : false;
+    const crit = hit ? Math.floor(this.randomSource() * 100) < critChance : false;
 
     // Compute damage (0 on miss)
     let dmg = 0;

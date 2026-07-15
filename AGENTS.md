@@ -425,6 +425,23 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
 - **Capacitor / TWA**: iOS/Android wrapper config, wake lock, status bar,
   pause/resume lifecycle, back button handling, safe area insets
 
+### 8.6 Deterministic Level Solver
+
+- **Headless `.ltproj` loading**: Node file resource adapter feeds the same
+  `Database` used by the browser without loading rendering assets
+- **Shared engine rules**: Solver reuses runtime units/items/skills, layered map
+  terrain, movement costs, Dijkstra/A*, AI behaviours, combat formulas, weapon
+  triangle, doubling, terrain bonuses, and strike sequencing
+- **Scenario inputs**: JSON controls level, roster, levels, EXP, items, stat
+  overrides, RNG seed/mode, turn cap, and explicit event-derived spawns
+- **Search**: Deterministic hill climbing with seed-range scans and worker-thread
+  shards; lexicographic scoring requires a clear before deaths, damage, turns,
+  and action count are minimized
+- **Replay**: Every action records a state snapshot for JSON verification and an
+  interactive grid animation
+- **Chapter 3 result**: Checked-in seed 115 route clears in 6 turns with zero
+  player damage/deaths; this is best-found, not a proof of turn optimality
+
 ---
 
 ## 9. File Architecture
@@ -520,6 +537,18 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
 | `main.ts` | ~496 | Bootstrap, canvas, game loop, state registration |
 | `pwa.ts` | ~310 | Service worker, install prompt, connectivity |
 | `native.ts` | ~210 | Capacitor/TWA platform detection, lifecycle |
+
+### Solver (`solver/`)
+| File | Purpose |
+|------|---------|
+| `cli.ts` | `inspect`/`run`/`solve`/`verify` command interface |
+| `project-loader.ts` | Filesystem `.ltproj` adapter for the engine database |
+| `simulator.ts` | Fast tactical phase runner, policy evaluation, and replay capture |
+| `search.ts` | Seed scans, policy mutation, hill climbing, result ordering |
+| `parallel-search.ts` / `worker.ts` | Multi-core search sharding |
+| `visualize.ts` | Standalone and Codex-inline replay renderers |
+| `scenarios/chapter-3.json` | Controllable Chapter 3 roster/loadout/seed fixture |
+| `solutions/chapter-3*.json` | Verifiable seed-selected and fixed-seed policies |
 
 ---
 

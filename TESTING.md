@@ -55,6 +55,27 @@ game loop is **replaced** with a programmatic API exposed on `window.__harness`:
 | `loadLevelClean(nid)` | Load a level, skip all events, go straight to `free` state |
 | `settle(maxFrames)` | Auto-advance through events/menus until reaching `free` state |
 | `giveItem(unitNid, itemNid)` | Give a DB item to a unit (returns `true` on success). Item is inserted at front of inventory so it becomes equipped. |
+| `setSeed(seed)` | Install a deterministic gameplay RNG stream for combat and level-ups |
+| `clearSeed()` | Restore normal `Math.random`-backed gameplay randomness |
+| `getSeedState()` | Read the current deterministic RNG state, or `null` when unseeded |
+
+### Headless Solver Tests
+
+The solver test suite covers the seeded RNG and a deterministic Chapter 3 clear
+through the real database, pathfinding, enemy AI, and combat systems:
+
+```bash
+npm run solver:test
+npm run solver:typecheck
+npm run solver -- verify --solution solver/solutions/chapter-3.json
+```
+
+The Chapter 3 integration test is skipped when `lt-maker/default.ltproj` is not
+available. Policy searches can use multiple worker threads:
+
+```bash
+npm run solver -- solve --iterations 1000 --workers 4
+```
 
 ### Sacred Stones Reliability Soak
 
@@ -101,6 +122,10 @@ await __harness.screenshot()
 
 // Check game state
 __harness.getState()
+
+// Reproduce combat and level-up rolls
+__harness.setSeed(115)
+__harness.getSeedState()
 
 // Auto-advance through events
 __harness.settle(500)

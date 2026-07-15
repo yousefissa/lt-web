@@ -1,6 +1,7 @@
 import type { NID, UnitPrefab, KlassDef, AlliancePair } from '../data/types';
 import type { ItemObject } from './item';
 import type { SkillObject } from './skill';
+import { random } from '../engine/random';
 
 /**
  * Opaque handle for whatever map-sprite representation the renderer uses.
@@ -232,7 +233,7 @@ export class UnitObject {
         // Growths can exceed 100 (guaranteed +1, then roll for +2)
         let remaining = growth;
         while (remaining > 0) {
-          const roll = Math.random() * 100;
+          const roll = random() * 100;
           if (roll < remaining) {
             gained++;
           }

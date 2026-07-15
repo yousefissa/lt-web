@@ -1053,11 +1053,15 @@ export class GameState {
       }
     }
 
-    // Equip starting skills from learned_skills (tuples of [requiredLevel, skillNid])
-    if (prefab.learned_skills) {
-      for (const [requiredLevel, skillNid] of prefab.learned_skills) {
+    // Equip personal and class skills available at the unit's starting level.
+    // LT stores the component NIDs on both the unit prefab and its class;
+    // walls and other map objects depend on class skills such as NoAvoid.
+    const learnedSkills = [...(prefab.learned_skills ?? []), ...(klassDef.learned_skills ?? [])];
+    if (learnedSkills.length > 0) {
+      for (const [requiredLevel, skillNid] of learnedSkills) {
         // Only equip skills the unit has reached the level for
         if (unit.level < requiredLevel) continue;
+        if (unit.skills.some((skill) => skill.nid === skillNid)) continue;
         const skillPrefab = this.db.skills.get(skillNid);
         if (skillPrefab) {
           const skill = new SkillObject(skillPrefab);

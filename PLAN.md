@@ -8,7 +8,8 @@ Lex Talionis Python/Pygame engine.
 
 ## Current State
 
-**84 source files, ~44,400 lines of TypeScript.**
+**88 engine source files, ~46,500 lines of TypeScript, plus 10 solver files
+(~1,800 lines).**
 Builds cleanly with zero type errors. All four development phases (Foundation,
 Playable, Visual Polish, Mobile/Distribution) are complete. The engine loads
 `.ltproj` game data over HTTP and runs at 60 fps on Canvas 2D with dynamic
@@ -104,6 +105,25 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
   resolves, matching Python's synchronous behavior and preventing async race frames.
 
 ### Recent Changes
+
+- **Deterministic headless level solver + Chapter 3 zero-damage solution:**
+  - Added `solver/` CLI that directly loads `.ltproj` JSON and reuses engine
+    `Database`, `UnitObject`, `ItemObject`, `GameBoard`, `PathSystem`,
+    `AIController`, combat calculations, and `CombatPhaseSolver`.
+  - Added scenario control for roster selection, unit level/EXP, inventories,
+    stat overrides, RNG seed/mode, max turns, and explicit scripted spawns.
+  - Added `inspect`, `run`, `solve`, and `verify` workflows, deterministic
+    seed-range search, hill-climbing policy mutations, and worker-thread shards.
+  - Added replay JSON plus standalone/inline animated map visualization output.
+  - Checked in `solver/solutions/chapter-3.json`: seed 115, 6 turns,
+    0 player damage, 0 deaths, 10 enemies defeated, 3 walls broken.
+  - Preserved a fixed-seed comparison in `chapter-3-seed-3.json`: 6 turns,
+    19 damage, 0 deaths, showing policy improvement separately from seed search.
+  - Added solver unit/integration tests and a separate solver typecheck config.
+  - Added seeded gameplay RNG control to combat, level-ups, and the browser harness.
+  - Fixed class-learned skill installation and LT serialized combat component
+    aliases (`damage`, `resist`, `hit`, `avoid`, `crit`, `crit_avoid`), discovered
+    when Level 3 breakable walls incorrectly retained ~80 avoid.
 
 - **Local development setup verified (July 15, 2026):**
   - Added a fresh shallow checkout of upstream `lt-maker` in the ignored
@@ -414,7 +434,7 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 - Non-silent promotion choice UI (visual class selection)
 - Supply menu state UI
 - Aura propagation, charge/cooldown, conditional activation, proc skills
-- RNG mode integration into combat solver
+- Difficulty-selection UI wiring into the combat RNG mode
 - Difficulty selection UI
 - Roam AI for NPCs, shop/talk menu in roam mode
 - Rescue icon, status effect icons, movement arrows on map

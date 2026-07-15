@@ -19,6 +19,7 @@ import type { Surface } from './engine/surface';
 import type { InputEvent, GameButton } from './engine/input';
 import { FRAMETIME, updateAnimationCounters } from './engine/constants';
 import { ItemObject } from './objects/item';
+import { clearRandomSeed, getRandomState, setRandomSeed } from './engine/random';
 
 export interface HarnessAPI {
   /** Step the game forward by N frames. Optionally inject an input on the first frame. */
@@ -45,6 +46,12 @@ export interface HarnessAPI {
   killUnit: (unitNid: string) => boolean;
   /** Trigger a game event by firing a trigger. Returns true if events were queued. */
   triggerEvent: (triggerType: string) => boolean;
+  /** Install a deterministic gameplay RNG seed. */
+  setSeed: (seed: number) => void;
+  /** Restore normal Math.random-backed gameplay randomness. */
+  clearSeed: () => void;
+  /** Current deterministic RNG state, or null when unseeded. */
+  getSeedState: () => number | null;
 }
 
 export interface HarnessState {
@@ -254,6 +261,18 @@ export function installHarness(
         { type: triggerType, levelNid },
         { game, gameVars: game.gameVars, levelVars: game.levelVars },
       );
+    },
+
+    setSeed(seed: number): void {
+      setRandomSeed(seed);
+    },
+
+    clearSeed(): void {
+      clearRandomSeed();
+    },
+
+    getSeedState(): number | null {
+      return getRandomState();
     },
   };
 

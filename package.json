@@ -9,6 +9,9 @@
     "preview": "vite preview",
     "test:harness": "playwright test tests/harness.spec.ts",
     "test:ss:soak": "node scripts/sacred-stones-soak.mjs",
+    "solver": "tsx solver/cli.ts",
+    "solver:test": "tsx --test solver/**/*.test.ts",
+    "solver:typecheck": "tsc -p tsconfig.solver.json",
     "bundle": "node scripts/bundle-assets.mjs",
     "generate-icons": "node scripts/generate-icons.mjs",
     "setup:capacitor": "node scripts/setup-native.mjs capacitor",
@@ -21,6 +24,8 @@
     "@capacitor/cli": "^8.1.0",
     "@capacitor/core": "^8.1.0",
     "@playwright/test": "^1.58.2",
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.1",
     "typescript": "~5.9.3",
     "vite": "^7.3.1"
   },

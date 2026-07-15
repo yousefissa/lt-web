@@ -38,6 +38,11 @@ function sumSkillValues(unit: UnitObject, componentNid: string): number {
   return total;
 }
 
+/** Sum values from LT's serialized component NID and an optional hook alias. */
+function sumSkillAliases(unit: UnitObject, ...componentNids: string[]): number {
+  return componentNids.reduce((total, nid) => total + sumSkillValues(unit, nid), 0);
+}
+
 /** Product of all numeric values for a component across all skills. */
 function productSkillValues(unit: UnitObject, componentNid: string, defaultVal: number = 1): number {
   let result = defaultVal;
@@ -184,32 +189,32 @@ export function growthChange(unit: UnitObject, statNid: string): number {
 
 /** Bonus damage from skills. */
 export function modifyDamage(unit: UnitObject, _item: ItemObject | null): number {
-  return sumSkillValues(unit, 'modify_damage');
+  return sumSkillAliases(unit, 'damage', 'modify_damage');
 }
 
 /** Bonus resist from skills. */
 export function modifyResist(unit: UnitObject, _item: ItemObject | null): number {
-  return sumSkillValues(unit, 'modify_resist');
+  return sumSkillAliases(unit, 'resist', 'modify_resist');
 }
 
 /** Bonus accuracy from skills. */
 export function modifyAccuracy(unit: UnitObject, _item: ItemObject | null): number {
-  return sumSkillValues(unit, 'modify_accuracy');
+  return sumSkillAliases(unit, 'hit', 'modify_accuracy');
 }
 
 /** Bonus avoid from skills. */
 export function modifyAvoid(unit: UnitObject, _item: ItemObject | null): number {
-  return sumSkillValues(unit, 'modify_avoid');
+  return sumSkillAliases(unit, 'avoid', 'modify_avoid');
 }
 
 /** Bonus crit accuracy from skills. */
 export function modifyCritAccuracy(unit: UnitObject, _item: ItemObject | null): number {
-  return sumSkillValues(unit, 'modify_crit_accuracy');
+  return sumSkillAliases(unit, 'crit', 'modify_crit_accuracy');
 }
 
 /** Bonus crit avoid from skills. */
 export function modifyCritAvoid(unit: UnitObject, _item: ItemObject | null): number {
-  return sumSkillValues(unit, 'modify_crit_avoid');
+  return sumSkillAliases(unit, 'crit_avoid', 'modify_crit_avoid');
 }
 
 /** Bonus crit damage from skills. */
@@ -219,12 +224,12 @@ export function modifyCritDamage(unit: UnitObject, _item: ItemObject | null): nu
 
 /** Attack speed modifier from skills. */
 export function modifyAttackSpeed(unit: UnitObject, _item: ItemObject | null): number {
-  return sumSkillValues(unit, 'modify_attack_speed');
+  return sumSkillAliases(unit, 'attack_speed', 'modify_attack_speed');
 }
 
 /** Defense speed modifier from skills. */
 export function modifyDefenseSpeed(unit: UnitObject, _item: ItemObject | null): number {
-  return sumSkillValues(unit, 'modify_defense_speed');
+  return sumSkillAliases(unit, 'defense_speed', 'modify_defense_speed');
 }
 
 // ============================================================
