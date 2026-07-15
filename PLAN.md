@@ -105,6 +105,12 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 ### Recent Changes
 
+- **Local development setup verified (July 15, 2026):**
+  - Added a fresh shallow checkout of upstream `lt-maker` in the ignored
+    `lt-maker/` directory and installed the npm dependencies.
+  - Confirmed `npm run build` succeeds and the Vite development server renders
+    the `default.ltproj` title screen without browser errors.
+
 - **Process docs update (agent commit/push policy clarified):**
   - Updated `AGENTS.md` commit policy section to explicitly state the
     rule applies to all session types and all edit scopes (code/docs/config).
