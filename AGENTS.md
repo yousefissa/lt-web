@@ -441,6 +441,10 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
   shards; lexicographic scoring requires a clear before deaths, damage, turns,
   and action count are minimized; policies include scenario-derived unit bias
   and per-unit risk dimensions. Seed scans are gated as non-benchmark diagnostics.
+- **Planner state**: Versioned checkpoints and independent clones preserve RNG,
+  turn/event lifecycle, metrics, unit flags/stats/positions, inventories/uses,
+  and replay state. Legal player actions are enumerable and validated one at a
+  time, with deterministic enemy/other phase stepping and cache-stable keys.
 - **Replay**: Every action records a state snapshot for JSON verification and an
   interactive grid animation
 - **Chapter 3 result**: Canonical fixed seed 3 route clears in 6 turns with zero
@@ -551,7 +555,7 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
 | `cli.ts` | `inspect`/`run`/`solve`/`verify` command interface |
 | `project-loader.ts` | Filesystem `.ltproj` adapter for the engine database |
 | `event-adapter.ts` | Objective inference and standard LT event effect derivation |
-| `simulator.ts` | Fast tactical phase runner, policy evaluation, and replay capture |
+| `simulator.ts` | Fast tactical runner, cloneable checkpoints, legal actions, deterministic phase stepping, policy evaluation, and replay capture |
 | `search.ts` | Seed scans, policy mutation, hill climbing, result ordering |
 | `parallel-search.ts` / `worker.ts` | Multi-core search sharding |
 | `visualize.ts` | Standalone and Codex-inline replay renderers |

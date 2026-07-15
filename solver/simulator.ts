@@ -38,6 +38,8 @@ import {
 } from './event-adapter';
 import type {
   MapSnapshot,
+  LegalActionOptions,
+  PlannerAction,
   PolicyWeights,
   Position,
   ReplayStep,
@@ -48,6 +50,8 @@ import type {
   SolverResult,
   SolverScenario,
   StrikeRecord,
+  TacticalCheckpoint,
+  TacticalUnitCheckpoint,
   TeamUnitConfig,
   UnitSnapshot,
 } from './types';
@@ -170,6 +174,7 @@ export class TacticalSimulator {
   private dangerMoveCache: Map<string, Position[]>;
   private eventSpawnRules: EventGroupSpawnRule[];
   private firedEventRules: Set<string>;
+  private playerPhasePrepared: boolean;
 
   constructor(db: Database, scenario: SolverScenario, policy: PolicyWeights = DEFAULT_POLICY) {
     this.db = db;
@@ -204,6 +209,7 @@ export class TacticalSimulator {
     this.dangerMoveCache = new Map();
     this.eventSpawnRules = scenario.eventAdapter === 'standard' ? eventPlan.spawnRules : [];
     this.firedEventRules = new Set();
+    this.playerPhasePrepared = false;
 
     this.seizePosition = this.findSeizePosition();
     this.spawnInitialUnits();
@@ -259,17 +265,12 @@ export class TacticalSimulator {
       if (this.cleared || this.lost) break;
     }
 
-    this.refreshOutcome();
-    this.metrics.cleared = this.cleared;
-    this.metrics.lost = this.lost;
-    this.metrics.remainingPlayerHp = this.playerUnits()
-      .filter((unit) => !unit.isDead())
-      .reduce((sum, unit) => sum + unit.currentHp, 0);
-    this.metrics.remainingEnemyHp = this.enemyUnits()
-      .filter((unit) => unit.position && !unit.isDead())
-      .reduce((sum, unit) => sum + unit.currentHp, 0);
+    return this.getResult(performance.now() - started);
+  }
 
-    const score = this.buildScore();
+  /** Return the current state in the same format as a completed simulation. */
+  getResult(elapsedMs = 0): SolverResult {
+    this.updateDerivedMetrics();
     return {
       scenario: this.scenario.name,
       levelNid: this.scenario.levelNid,
@@ -279,12 +280,307 @@ export class TacticalSimulator {
       rngMode: this.rngMode,
       policy: copyPolicy(this.policy),
       metrics: { ...this.metrics },
-      score,
+      score: this.buildScore(),
       map: this.mapSnapshot(),
       replay: this.replay,
       finalUnits: this.snapshotUnits(),
-      elapsedMs: performance.now() - started,
+      elapsedMs,
     };
+  }
+
+  /** Prepare exactly one player turn. Safe to call repeatedly for the same turn. */
+  beginPlayerTurn(): void {
+    if (this.playerPhasePrepared || this.cleared || this.lost) return;
+    if (this.currentTurn > this.scenario.maxTurns) return;
+    this.metrics.turns = this.currentTurn;
+    this.currentPhase = 'player';
+    this.runEventSpawns();
+    this.runScriptedSpawns('player');
+    for (const unit of this.playerUnits()) unit.resetTurnState();
+    this.playerPhasePrepared = true;
+    this.refreshOutcome();
+  }
+
+  /** Whether every living, deployed player unit has consumed its action. */
+  isPlayerTurnComplete(): boolean {
+    return this.cleared || this.lost || this.playerUnits().every(
+      (unit) => !unit.position || unit.isDead() || unit.finished,
+    );
+  }
+
+  isTerminal(): boolean {
+    return this.cleared || this.lost || this.currentTurn > this.scenario.maxTurns;
+  }
+
+  /**
+   * Enumerate deterministic legal actions from the current player state.
+   * Limits are optional beam-search pruning knobs; without them this returns
+   * every legal attack, heal, move destination, seize, and wait action.
+   */
+  enumerateLegalActions(options: LegalActionOptions = {}): PlannerAction[] {
+    if (!this.playerPhasePrepared || this.currentPhase !== 'player' || this.isTerminal()) return [];
+    this.dangerMoveCache.clear();
+    const actions: PlannerAction[] = [];
+    const active = this.playerUnits().filter(
+      (unit) => unit.position && !unit.isDead() && !unit.finished,
+    );
+
+    for (const unit of active) {
+      const original = clonePosition(unit.position)!;
+      const validMoves = this.pathSystem.getValidMoves(unit, this.board);
+      const unitActions: PlannerAction[] = [];
+
+      if (this.objectiveType === 'seize' && this.seizePosition && unit.tags.includes('Lord')) {
+        if (validMoves.some((position) => samePosition(position, this.seizePosition!))) {
+          unitActions.push({
+            type: 'seize',
+            actor: unit.nid,
+            position: clonePosition(this.seizePosition)!,
+            heuristic: Number.MAX_SAFE_INTEGER,
+          });
+        }
+      }
+
+      const attacks: PlannerAction[] = [];
+      for (let itemIndex = 0; itemIndex < unit.items.length; itemIndex++) {
+        const item = unit.items[itemIndex];
+        if (!item.isWeapon() || !item.hasUsesRemaining()) continue;
+        for (const target of this.hostileUnits(unit)) {
+          if (!target.position) continue;
+          for (const position of validMoves) {
+            const distance = manhattan(position, target.position);
+            if (distance < item.getMinRange() || distance > item.getMaxRange()) continue;
+            attacks.push({
+              type: 'attack',
+              actor: unit.nid,
+              target: target.nid,
+              item: item.nid,
+              itemIndex,
+              position: clonePosition(position)!,
+              heuristic: this.scoreAttack(unit, target, item, position),
+            });
+          }
+        }
+      }
+      attacks.sort(comparePlannerActions);
+      unitActions.push(...limitActions(attacks, options.maxAttacksPerUnit));
+
+      const heals: PlannerAction[] = [];
+      const injured = this.playerUnits().filter(
+        (target) => target.position && !target.isDead() && target.currentHp < target.maxHp,
+      );
+      for (let itemIndex = 0; itemIndex < unit.items.length; itemIndex++) {
+        const item = unit.items[itemIndex];
+        if (!item.canHeal() || !item.hasUsesRemaining()) continue;
+        const targets = item.isSpell() ? injured : injured.filter((target) => target === unit);
+        for (const target of targets) {
+          if (!target.position) continue;
+          for (const position of validMoves) {
+            const distance = manhattan(position, target.position);
+            if (item.isSpell() && (distance < item.getMinRange() || distance > item.getMaxRange())) continue;
+            const amount = Math.min(
+              target.maxHp - target.currentHp,
+              item.getHealAmount(unit.getStatValue('MAG')),
+            );
+            if (amount <= 0) continue;
+            heals.push({
+              type: 'heal',
+              actor: unit.nid,
+              target: target.nid,
+              item: item.nid,
+              itemIndex,
+              position: clonePosition(position)!,
+              heuristic: amount * this.policy.heal
+                + this.objectiveProgress(original, position) * this.policy.progress,
+            });
+          }
+        }
+      }
+      heals.sort(comparePlannerActions);
+      unitActions.push(...limitActions(heals, options.maxHealsPerUnit));
+
+      const moves: PlannerAction[] = [];
+      for (const position of validMoves) {
+        if (samePosition(position, original)) continue;
+        const progress = this.objectiveProgress(original, position);
+        this.board.moveUnit(unit, position[0], position[1]);
+        const danger = this.expectedDanger(unit);
+        this.board.moveUnit(unit, original[0], original[1]);
+        let heuristic = progress * this.policy.progress
+          - danger * this.policy.danger * (this.policy.unitRisk?.[unit.nid] ?? 1);
+        heuristic += this.policy.unitBias[unit.nid] ?? 0;
+        heuristic += (unit.currentHp / Math.max(1, unit.maxHp)) * this.policy.stayHealthy;
+        moves.push({
+          type: 'move',
+          actor: unit.nid,
+          position: clonePosition(position)!,
+          heuristic,
+        });
+      }
+      moves.sort(comparePlannerActions);
+      unitActions.push(...limitActions(moves, options.maxMovesPerUnit));
+
+      if (options.includeWait !== false) {
+        unitActions.push({
+          type: 'wait',
+          actor: unit.nid,
+          position: original,
+          heuristic: -1,
+        });
+      }
+      actions.push(...unitActions);
+    }
+
+    return actions.sort(comparePlannerActions);
+  }
+
+  /** Apply one action previously returned by enumerateLegalActions. */
+  applyPlayerAction(action: PlannerAction): void {
+    if (!this.playerPhasePrepared || this.currentPhase !== 'player') {
+      throw new Error('Player turn has not been prepared');
+    }
+    const unit = this.units.get(action.actor);
+    if (!unit?.position || unit.isDead() || unit.finished || unit.team !== 'player') {
+      throw new Error(`Inactive player unit: ${action.actor}`);
+    }
+    const validMoves = this.pathSystem.getValidMoves(unit, this.board);
+    if (!validMoves.some((position) => samePosition(position, action.position))) {
+      throw new Error(`Illegal destination ${action.position.join(',')} for ${action.actor}`);
+    }
+
+    if (action.type === 'wait') {
+      if (!samePosition(unit.position, action.position)) throw new Error('Wait must use the current position');
+      unit.finished = true;
+      this.metrics.actions++;
+      this.recordStep('wait', `${unit.name} waits`, unit, unit.position);
+    } else if (action.type === 'move') {
+      this.moveAndFinish(unit, action.position, 'move');
+    } else if (action.type === 'seize') {
+      if (this.objectiveType !== 'seize' || !unit.tags.includes('Lord')
+        || !this.seizePosition || !samePosition(action.position, this.seizePosition)) {
+        throw new Error(`Illegal seize by ${action.actor}`);
+      }
+      this.moveAndFinish(unit, action.position, 'seize');
+      this.cleared = true;
+      this.recordStep('seize', `${unit.name} seizes the throne`, unit, unit.position);
+    } else {
+      const item = action.itemIndex === undefined ? undefined : unit.items[action.itemIndex];
+      const target = action.target ? this.units.get(action.target) : undefined;
+      if (!item || item.nid !== action.item || !item.hasUsesRemaining() || !target?.position || target.isDead()) {
+        throw new Error(`Invalid ${action.type} target or item for ${action.actor}`);
+      }
+      const distance = manhattan(action.position, target.position);
+      if (action.type === 'attack') {
+        if (!item.isWeapon() || this.db.areAllied(unit.team, target.team)
+          || distance < item.getMinRange() || distance > item.getMaxRange()) {
+          throw new Error(`Illegal attack by ${action.actor}`);
+        }
+        this.executeAttack(unit, target, item, action.position);
+      } else {
+        const selfConsumable = !item.isSpell() && target === unit;
+        if (!item.canHeal() || !this.db.areAllied(unit.team, target.team)
+          || (!selfConsumable && (distance < item.getMinRange() || distance > item.getMaxRange()))) {
+          throw new Error(`Illegal heal by ${action.actor}`);
+        }
+        const amount = Math.min(
+          target.maxHp - target.currentHp,
+          item.getHealAmount(unit.getStatValue('MAG')),
+        );
+        this.executeHeal({ unit, target, item, position: action.position, amount, score: action.heuristic });
+      }
+    }
+    this.refreshOutcome();
+  }
+
+  /** Resolve deterministic enemy/other phases and advance to the next turn. */
+  finishTurn(): void {
+    if (!this.playerPhasePrepared) throw new Error('Player turn has not been prepared');
+    if (!this.isPlayerTurnComplete()) throw new Error('Player units still have legal actions');
+    if (!this.cleared && !this.lost) {
+      this.runScriptedSpawns('enemy');
+      this.runAiPhase('enemy');
+    }
+    if (!this.cleared && !this.lost) {
+      this.runScriptedSpawns('other');
+      this.runAiPhase('other');
+    }
+    this.playerPhasePrepared = false;
+    this.refreshOutcome();
+    this.updateDerivedMetrics();
+    this.currentTurn++;
+  }
+
+  createCheckpoint(includeReplay = true): TacticalCheckpoint {
+    return {
+      version: 1,
+      currentTurn: this.currentTurn,
+      currentPhase: this.currentPhase,
+      playerPhasePrepared: this.playerPhasePrepared,
+      cleared: this.cleared,
+      lost: this.lost,
+      rngState: this.rng.getState(),
+      initialPlayerHp: this.initialPlayerHp,
+      metrics: { ...this.metrics },
+      firedEventRules: Array.from(this.firedEventRules).sort(),
+      units: Array.from(this.units.values()).map((unit) => this.checkpointUnit(unit))
+        .sort((a, b) => a.nid.localeCompare(b.nid)),
+      replay: includeReplay ? structuredClone(this.replay) : undefined,
+    };
+  }
+
+  restoreCheckpoint(checkpoint: TacticalCheckpoint): void {
+    if (checkpoint.version !== 1) throw new Error(`Unsupported checkpoint version: ${checkpoint.version}`);
+    for (const unit of this.units.values()) this.board.removeUnit(unit);
+
+    const checkpointNids = new Set(checkpoint.units.map((unit) => unit.nid));
+    for (const nid of Array.from(this.units.keys())) {
+      if (!checkpointNids.has(nid)) this.units.delete(nid);
+    }
+
+    for (const saved of checkpoint.units) {
+      let unit = this.units.get(saved.nid);
+      if (!unit) {
+        const data = this.level.units.find((candidate) => candidate.nid === saved.nid);
+        if (data) unit = this.spawnLevelUnit(data, saved.team, null) ?? undefined;
+        if (!unit) {
+          const prefab = this.db.units.get(saved.nid);
+          if (prefab) unit = this.spawnFromPrefab(prefab, saved.team, null, saved.ai) ?? undefined;
+        }
+      }
+      if (!unit) throw new Error(`Cannot restore unknown unit: ${saved.nid}`);
+      this.restoreUnit(unit, saved);
+    }
+
+    for (const saved of checkpoint.units) {
+      const unit = this.units.get(saved.nid)!;
+      unit.rescuing = saved.rescuing ? this.units.get(saved.rescuing) ?? null : null;
+      unit.rescuedBy = saved.rescuedBy ? this.units.get(saved.rescuedBy) ?? null : null;
+      if (saved.position && !saved.dead) this.board.setUnit(saved.position[0], saved.position[1], unit);
+    }
+
+    this.currentTurn = checkpoint.currentTurn;
+    this.currentPhase = checkpoint.currentPhase;
+    this.playerPhasePrepared = checkpoint.playerPhasePrepared;
+    this.cleared = checkpoint.cleared;
+    this.lost = checkpoint.lost;
+    this.initialPlayerHp = checkpoint.initialPlayerHp;
+    this.metrics = { ...checkpoint.metrics };
+    this.firedEventRules = new Set(checkpoint.firedEventRules);
+    this.replay = checkpoint.replay ? structuredClone(checkpoint.replay) : [];
+    this.rng.setState(checkpoint.rngState);
+    this.dangerMoveCache.clear();
+  }
+
+  clone(includeReplay = true): TacticalSimulator {
+    const clone = new TacticalSimulator(this.db, this.scenario, this.policy);
+    clone.restoreCheckpoint(this.createCheckpoint(includeReplay));
+    return clone;
+  }
+
+  /** Canonical cache key including the RNG stream and cumulative objective cost. */
+  getTranspositionKey(): string {
+    const checkpoint = this.createCheckpoint(false);
+    return JSON.stringify(checkpoint);
   }
 
   getAsciiMap(): string {
@@ -990,6 +1286,93 @@ export class TacticalSimulator {
     );
   }
 
+  private updateDerivedMetrics(): void {
+    this.refreshOutcome();
+    this.metrics.cleared = this.cleared;
+    this.metrics.lost = this.lost;
+    this.metrics.remainingPlayerHp = this.playerUnits()
+      .filter((unit) => !unit.isDead())
+      .reduce((sum, unit) => sum + unit.currentHp, 0);
+    this.metrics.remainingEnemyHp = this.enemyUnits()
+      .filter((unit) => unit.position && !unit.isDead())
+      .reduce((sum, unit) => sum + unit.currentHp, 0);
+  }
+
+  private checkpointUnit(unit: UnitObject): TacticalUnitCheckpoint {
+    return {
+      nid: unit.nid,
+      name: unit.name,
+      team: unit.team,
+      klass: unit.klass,
+      level: unit.level,
+      exp: unit.exp,
+      position: clonePosition(unit.position),
+      startingPosition: clonePosition(unit.startingPosition),
+      currentHp: unit.currentHp,
+      dead: unit.dead,
+      stats: { ...unit.stats },
+      growths: { ...unit.growths },
+      maxStats: { ...unit.maxStats },
+      wexp: { ...unit.wexp },
+      tags: [...unit.tags],
+      ai: unit.ai,
+      aiGroup: unit.aiGroup,
+      items: unit.items.map((item) => ({
+        nid: item.nid,
+        uses: item.uses,
+        droppable: item.droppable,
+      })),
+      hasAttacked: unit.hasAttacked,
+      hasMoved: unit.hasMoved,
+      hasTraded: unit.hasTraded,
+      finished: unit.finished,
+      hasCanto: unit.hasCanto,
+      party: unit.party,
+      persistent: unit.persistent,
+      statusEffects: structuredClone(unit.statusEffects),
+      rescuing: unit.rescuing?.nid,
+      rescuedBy: unit.rescuedBy?.nid,
+    };
+  }
+
+  private restoreUnit(unit: UnitObject, saved: TacticalUnitCheckpoint): void {
+    unit.name = saved.name;
+    unit.team = saved.team;
+    unit.klass = saved.klass;
+    unit.level = saved.level;
+    unit.exp = saved.exp;
+    unit.position = null;
+    unit.startingPosition = clonePosition(saved.startingPosition);
+    unit.currentHp = saved.currentHp;
+    unit.dead = saved.dead;
+    unit.stats = { ...saved.stats };
+    unit.growths = { ...saved.growths };
+    unit.maxStats = { ...saved.maxStats };
+    unit.wexp = { ...saved.wexp };
+    unit.tags = [...saved.tags];
+    unit.ai = saved.ai;
+    unit.aiGroup = saved.aiGroup;
+    unit.items = saved.items.map((savedItem) => {
+      const prefab = this.db.items.get(savedItem.nid);
+      if (!prefab) throw new Error(`Cannot restore unknown item: ${savedItem.nid}`);
+      const item = new ItemObject(prefab);
+      item.owner = unit;
+      item.uses = savedItem.uses;
+      item.droppable = savedItem.droppable;
+      return item;
+    });
+    unit.hasAttacked = saved.hasAttacked;
+    unit.hasMoved = saved.hasMoved;
+    unit.hasTraded = saved.hasTraded;
+    unit.finished = saved.finished;
+    unit.hasCanto = saved.hasCanto;
+    unit.party = saved.party;
+    unit.persistent = saved.persistent;
+    unit.statusEffects = structuredClone(saved.statusEffects) as typeof unit.statusEffects;
+    unit.rescuing = null;
+    unit.rescuedBy = null;
+  }
+
   private snapshotUnits(): UnitSnapshot[] {
     return Array.from(this.units.values())
       .map((unit) => ({
@@ -1054,4 +1437,23 @@ export class TacticalSimulator {
 function distanceBetween(a: UnitObject, b: UnitObject): number {
   if (!a.position || !b.position) return 99;
   return manhattan(a.position, b.position);
+}
+
+function samePosition(a: Position | null, b: Position | null): boolean {
+  return !!a && !!b && a[0] === b[0] && a[1] === b[1];
+}
+
+function comparePlannerActions(a: PlannerAction, b: PlannerAction): number {
+  return b.heuristic - a.heuristic
+    || a.actor.localeCompare(b.actor)
+    || a.type.localeCompare(b.type)
+    || (a.target ?? '').localeCompare(b.target ?? '')
+    || (a.itemIndex ?? -1) - (b.itemIndex ?? -1)
+    || a.position[1] - b.position[1]
+    || a.position[0] - b.position[0];
+}
+
+function limitActions(actions: PlannerAction[], limit: number | undefined): PlannerAction[] {
+  if (limit === undefined) return actions;
+  return actions.slice(0, Math.max(0, limit));
 }

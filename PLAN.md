@@ -9,7 +9,7 @@ Lex Talionis Python/Pygame engine.
 ## Current State
 
 **88 engine source files, ~46,500 lines of TypeScript, plus 12 solver files
-(~2,400 lines).**
+(~2,900 lines).**
 Builds cleanly with zero type errors. All four development phases (Foundation,
 Playable, Visual Polish, Mobile/Distribution) are complete. The engine loads
 `.ltproj` game data over HTTP and runs at 60 fps on Canvas 2D with dynamic
@@ -110,6 +110,18 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
   resolves, matching Python's synchronous behavior and preventing async race frames.
 
 ### Recent Changes
+
+- **Cloneable tactical planner foundation:**
+  - Added versioned simulator checkpoints covering the exact RNG stream, turn
+    lifecycle, event trigger set, cumulative metrics, mutable unit state,
+    inventories/uses, rescue links, and optional replay history.
+  - Added independent simulator cloning/restoration and canonical transposition
+    keys so search branches cannot share mutable state or silently change seeds.
+  - Added full legal player-action enumeration (attack/heal/move/wait/seize),
+    duplicate-item slot identity, optional beam pruning limits, validated action
+    application, and deterministic enemy/other phase advancement.
+  - Added integration coverage proving a cloned branch stays identical after
+    applying the same action, including RNG, unit, inventory, and metric state.
 
 - **Fixed-seed benchmark contract correction:**
   - Made the scenario seed part of the immutable benchmark instance; canonical

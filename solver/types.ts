@@ -133,6 +133,84 @@ export interface SolverResult {
   elapsedMs: number;
 }
 
+export type PlannerActionType = 'attack' | 'heal' | 'move' | 'wait' | 'seize';
+
+/** A fully specified, deterministic player action emitted by the simulator. */
+export interface PlannerAction {
+  type: PlannerActionType;
+  actor: string;
+  position: Position;
+  target?: string;
+  item?: string;
+  /** Inventory slot, used to distinguish duplicate copies of the same item. */
+  itemIndex?: number;
+  /** Greedy policy estimate used only for branch ordering, never legality. */
+  heuristic: number;
+}
+
+export interface LegalActionOptions {
+  /** Optional search-only pruning. Omit to enumerate every legal move destination. */
+  maxMovesPerUnit?: number;
+  /** Optional search-only pruning. Omit to enumerate every legal attack. */
+  maxAttacksPerUnit?: number;
+  /** Optional search-only pruning. Omit to enumerate every legal heal. */
+  maxHealsPerUnit?: number;
+  includeWait?: boolean;
+}
+
+export interface TacticalItemCheckpoint {
+  nid: string;
+  uses: number;
+  droppable: boolean;
+}
+
+export interface TacticalUnitCheckpoint {
+  nid: string;
+  name: string;
+  team: string;
+  klass: string;
+  level: number;
+  exp: number;
+  position: Position | null;
+  startingPosition: Position | null;
+  currentHp: number;
+  dead: boolean;
+  stats: Record<string, number>;
+  growths: Record<string, number>;
+  maxStats: Record<string, number>;
+  wexp: Record<string, number>;
+  tags: string[];
+  ai: string;
+  aiGroup: string;
+  items: TacticalItemCheckpoint[];
+  hasAttacked: boolean;
+  hasMoved: boolean;
+  hasTraded: boolean;
+  finished: boolean;
+  hasCanto: boolean;
+  party: string;
+  persistent: boolean;
+  statusEffects: unknown[];
+  rescuing?: string;
+  rescuedBy?: string;
+}
+
+/** Serializable simulator state. Immutable database/map data is intentionally excluded. */
+export interface TacticalCheckpoint {
+  version: 1;
+  currentTurn: number;
+  currentPhase: SolverPhase;
+  playerPhasePrepared: boolean;
+  cleared: boolean;
+  lost: boolean;
+  rngState: number;
+  initialPlayerHp: number;
+  metrics: SolverMetrics;
+  firedEventRules: string[];
+  units: TacticalUnitCheckpoint[];
+  replay?: ReplayStep[];
+}
+
 export interface SearchOptions {
   iterations: number;
   searchSeed: number;

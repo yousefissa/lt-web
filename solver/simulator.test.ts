@@ -86,3 +86,31 @@ test('saved Chapter 3 fixed-seed solution remains a no-death clear', {
   assert.equal(result.metrics.playerDeaths, 0);
   assert.equal(result.metrics.cleared, true);
 });
+
+test('planner checkpoints clone exact RNG, unit, inventory, and turn state', {
+  skip: !existsSync(projectPath),
+}, async () => {
+  const scenario = JSON.parse(await readFile(scenarioPath, 'utf8')) as SolverScenario;
+  const { db } = await loadSolverProject(projectPath);
+  const simulator = new TacticalSimulator(db, scenario);
+  simulator.beginPlayerTurn();
+
+  const actions = simulator.enumerateLegalActions({
+    maxMovesPerUnit: 2,
+    maxAttacksPerUnit: 2,
+    maxHealsPerUnit: 1,
+  });
+  assert.ok(actions.length > 0);
+  assert.ok(actions.some((action) => action.type === 'wait'));
+  assert.ok(actions.some((action) => action.type === 'move' || action.type === 'attack'));
+
+  const clone = simulator.clone(false);
+  assert.equal(clone.getTranspositionKey(), simulator.getTranspositionKey());
+  const chosen = actions.find((action) => action.type === 'attack') ?? actions[0];
+  simulator.applyPlayerAction(chosen);
+  clone.applyPlayerAction(chosen);
+
+  assert.equal(clone.getTranspositionKey(), simulator.getTranspositionKey());
+  assert.deepEqual(clone.getResult().metrics, simulator.getResult().metrics);
+  assert.deepEqual(clone.getResult().finalUnits, simulator.getResult().finalUnits);
+});
