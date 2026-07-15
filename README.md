@@ -21,8 +21,8 @@ npm run solver -- inspect
 # Run Chapter 4 with its event-derived rout objective
 npm run solver -- run --scenario solver/scenarios/chapter-4.json
 
-# Search policies and seeds in parallel, then save a replay
-npm run solver -- solve --seed-range 0:255 --iterations 4000 --workers 4 \
+# Search policies against the scenario's fixed seed, then save a replay
+npm run solver -- solve --iterations 4000 --workers 4 \
   --solution-out solver/solutions/chapter-3.json \
   --html solver-output/chapter-3.html
 
@@ -32,16 +32,18 @@ npm run solver -- verify --scenario solver/scenarios/chapter-4.json \
   --solution solver/solutions/chapter-4.json
 ```
 
-The checked-in Chapter 3 solution uses seed `115` and clears in 6 turns with
-zero player damage and zero deaths. This is the best route found by the current
-search, not a proof of minimum turn count. The fixed default seed `3` incumbent
-also clears in 6 turns with zero deaths and 19 damage. Create another scenario under
-`solver/scenarios/` to change the party, level, equipment, events, or objective.
+The canonical Chapter 3 benchmark fixes seed `3` and clears in 6 turns with
+zero deaths and 19 damage. Create another scenario under `solver/scenarios/`
+to change the party, level, equipment, events, or objective; its `seed` remains
+part of that fixed problem instance.
 
-The checked-in Chapter 4 route uses the reusable standard event adapter and
-seed `211`. It routs 22 enemies plus the Snag in 5 turns with zero deaths and
-17 cumulative damage. The fixed seed `4` comparison also clears in 5 turns
-with zero deaths and 22 damage. `--workers` parallelizes both policy candidates
-and seed-range scans.
+The canonical Chapter 4 benchmark fixes seed `4`. It uses the reusable standard
+event adapter and routs 22 enemies plus the Snag in 5 turns with zero deaths and
+22 cumulative damage. `--workers` parallelizes policy candidates without
+changing the gameplay RNG stream.
+
+Seed-range scanning is deliberately excluded from benchmark results. The CLI
+requires `--allow-seed-search` alongside `--seed-range` and labels that path as
+non-benchmark diagnostic work.
 
 See [TESTING.md](./TESTING.md) for solver and browser regression commands.

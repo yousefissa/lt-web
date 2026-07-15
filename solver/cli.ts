@@ -19,6 +19,7 @@ interface CliOptions {
   workers: number;
   searchSeed: number;
   seedRange?: [number, number];
+  allowSeedSearch: boolean;
   outputPath?: string;
   solutionOutputPath?: string;
   htmlPath?: string;
@@ -54,7 +55,8 @@ async function main(): Promise<void> {
   if (options.command === 'verify') {
     if (!options.solutionPath) throw new Error('verify requires --solution <path>');
     const saved = JSON.parse(await readFile(path.resolve(options.solutionPath), 'utf8')) as SolverResult;
-    scenario.seed = saved.seed;
+    assertFixedSeed(scenario.seed, saved.seed, options);
+    if (options.allowSeedSearch) scenario.seed = saved.seed;
     const rerun = new TacticalSimulator(db, scenario, saved.policy).run();
     const matches = compareResults(rerun, saved) === 0 && JSON.stringify(rerun.metrics) === JSON.stringify(saved.metrics);
     console.log(formatSummary(rerun));
@@ -68,11 +70,16 @@ async function main(): Promise<void> {
     let startingPolicy: PolicyWeights = DEFAULT_POLICY;
     if (options.solutionPath) {
       const saved = JSON.parse(await readFile(path.resolve(options.solutionPath), 'utf8')) as SolverResult;
-      scenario.seed = saved.seed;
+      assertFixedSeed(scenario.seed, saved.seed, options);
+      if (options.allowSeedSearch) scenario.seed = saved.seed;
       startingPolicy = saved.policy;
       console.error(`continuing from ${options.solutionPath}: seed ${saved.seed} score [${saved.score.join(', ')}]`);
     }
     if (options.seedRange) {
+      if (!options.allowSeedSearch) {
+        throw new Error('--seed-range is disabled for fixed-seed benchmarks; add --allow-seed-search only for explicitly non-benchmark diagnostics');
+      }
+      console.error('warning: seed search is non-benchmark diagnostic work and must not become the canonical solution');
       const seedBest = options.workers > 1
         ? await searchSeedRangeParallel(
           projectPath,
@@ -128,6 +135,7 @@ function parseArgs(args: string[]): CliOptions {
     iterations: 250,
     workers: 1,
     searchSeed: 1,
+    allowSeedSearch: false,
     json: false,
   };
   for (let index = 0; index < args.length; index++) {
@@ -141,6 +149,7 @@ function parseArgs(args: string[]): CliOptions {
     else if (arg === '--workers') { options.workers = Number(required(value, arg)); index++; }
     else if (arg === '--search-seed') { options.searchSeed = Number(required(value, arg)); index++; }
     else if (arg === '--seed-range') { options.seedRange = parseRange(required(value, arg)); index++; }
+    else if (arg === '--allow-seed-search') options.allowSeedSearch = true;
     else if (arg === '--out') { options.outputPath = required(value, arg); index++; }
     else if (arg === '--solution-out') { options.solutionOutputPath = required(value, arg); index++; }
     else if (arg === '--html') { options.htmlPath = required(value, arg); index++; }
@@ -162,6 +171,14 @@ function parseRange(value: string): [number, number] {
   const match = value.match(/^(-?\d+):(-?\d+)$/);
   if (!match) throw new Error('--seed-range must be FROM:TO');
   return [Number(match[1]), Number(match[2])];
+}
+
+function assertFixedSeed(scenarioSeed: number, solutionSeed: number, options: CliOptions): void {
+  if (scenarioSeed === solutionSeed || options.allowSeedSearch) return;
+  throw new Error(
+    `Fixed-seed mismatch: scenario requires seed ${scenarioSeed}, but the solution uses ${solutionSeed}. `
+    + 'Use a matching solution; --allow-seed-search is reserved for non-benchmark diagnostics.',
+  );
 }
 
 async function readScenario(filename: string): Promise<SolverScenario> {
@@ -221,9 +238,9 @@ function printHelp(): void {
   console.log(`Fire Emblem level solver\n\n` +
     `  npm run solver -- inspect [--scenario FILE] [--project PATH]\n` +
     `  npm run solver -- run [--seed N] [--out FILE] [--html FILE] [--json]\n` +
-    `  npm run solver -- solve [--iterations N] [--workers N] [--solution FILE] [--seed-range A:B] [--solution-out FILE] [--html FILE] [--fragment FILE]\n` +
+    `  npm run solver -- solve [--iterations N] [--workers N] [--solution FILE] [--solution-out FILE] [--html FILE] [--fragment FILE]\n` +
     `  npm run solver -- verify --solution FILE\n\n` +
-    `Scenario JSON controls selected units, levels, EXP, items, seed, RNG mode, and turn cap.`);
+    `The scenario seed is a fixed benchmark input. Non-benchmark RNG diagnostics require both --seed-range A:B and --allow-seed-search.`);
 }
 
 main().catch((error: unknown) => {

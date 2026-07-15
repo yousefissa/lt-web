@@ -437,17 +437,17 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
   and any remaining explicit spawns
 - **Event adapter**: Infers seize/rout objectives and applies common level-start
   unit/group/stat/tag/scripted-combat effects plus turn/region group reinforcements
-- **Search**: Deterministic hill climbing with multi-core policy and seed-range
+- **Search**: Deterministic fixed-seed hill climbing with multi-core policy
   shards; lexicographic scoring requires a clear before deaths, damage, turns,
   and action count are minimized; policies include scenario-derived unit bias
-  and per-unit risk dimensions
+  and per-unit risk dimensions. Seed scans are gated as non-benchmark diagnostics.
 - **Replay**: Every action records a state snapshot for JSON verification and an
   interactive grid animation
-- **Chapter 3 result**: Checked-in seed 115 route clears in 6 turns with zero
-  player damage/deaths; this is best-found, not a proof of turn optimality
-- **Chapter 4 result**: Checked-in seed 211 route clears the event-derived rout
-  objective in 5 turns with zero deaths and 17 damage; fixed seed 4 takes 22
-  damage. Both results include Turn 2 and lower-map trigger reinforcements.
+- **Chapter 3 result**: Canonical fixed seed 3 route clears in 6 turns with zero
+  deaths and 19 damage; this is best-found, not a proof of turn optimality
+- **Chapter 4 result**: Canonical fixed seed 4 route clears the event-derived
+  rout objective in 5 turns with zero deaths and 22 damage, including Turn 2
+  and lower-map trigger reinforcements.
 
 ---
 
@@ -556,7 +556,8 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
 | `parallel-search.ts` / `worker.ts` | Multi-core search sharding |
 | `visualize.ts` | Standalone and Codex-inline replay renderers |
 | `scenarios/chapter-{3,4}.json` | Controllable roster/loadout/seed/event fixtures |
-| `solutions/chapter-{3,4}*.json` | Verifiable seed-selected and fixed-seed policies |
+| `solutions/chapter-{3,4}.json` | Canonical verifiable fixed-seed policies |
+| `solutions/*-seed-selected.json` | Explicitly non-benchmark RNG diagnostics |
 
 ---
 

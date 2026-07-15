@@ -74,11 +74,12 @@ npm run solver -- verify --scenario solver/scenarios/chapter-4.json \
 ```
 
 Project-backed integration tests are skipped when `lt-maker/default.ltproj` is
-not available. Policy and seed-range searches can use multiple worker threads:
+not available. Policy searches can use multiple worker threads while keeping
+the scenario seed fixed:
 
 ```bash
 npm run solver -- solve --scenario solver/scenarios/chapter-4.json \
-  --seed-range 0:1023 --iterations 1000 --workers 4
+  --iterations 1000 --workers 4
 ```
 
 ### Sacred Stones Reliability Soak

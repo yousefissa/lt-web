@@ -1,0 +1,60 @@
+{
+  "scenario": "Sacred Stones Ch. 4: Ancient Horrors",
+  "levelNid": "4",
+  "objective": "rout",
+  "seed": 211,
+  "rngState": 2504613991,
+  "rngMode": "true_hit",
+  "benchmarkEligible": false,
+  "policy": {
+    "kill": 419.52710906071695,
+    "bossKill": 290.86250091937393,
+    "damage": 0.4314188335123163,
+    "counterDamage": 14.071330861924434,
+    "lethalRisk": 2570.1715068574654,
+    "progress": 15.04413318770315,
+    "danger": 4.297248659790319,
+    "wall": 862.3424166141467,
+    "heal": 7.58008135134989,
+    "stayHealthy": 84.90651772957057,
+    "unitBias": {
+      "Seth": 7.641807848587632,
+      "Eirika": -13.649881195276976,
+      "Franz": 60.32784849219024,
+      "Gilliam": 24.67461178638041,
+      "Garcia": 96.65460435673594,
+      "Vanessa": -22.33557185716927,
+      "Ross": 11.067147003486753,
+      "Neimi": 9.909088177606463,
+      "Moulder": 35.198654191568494,
+      "Colm": 0,
+      "Artur": 0
+    },
+    "unitRisk": {
+      "Eirika": 1,
+      "Seth": 1,
+      "Gilliam": 1,
+      "Vanessa": 1,
+      "Moulder": 1,
+      "Ross": 1,
+      "Colm": 1,
+      "Neimi": 1,
+      "Artur": 1
+    }
+  },
+  "metrics": {
+    "cleared": true,
+    "lost": false,
+    "turns": 5,
+    "actions": 78,
+    "combats": 38,
+    "damageTaken": 17,
+    "healingReceived": 17,
+    "playerDeaths": 0,
+    "enemiesDefeated": 22,
+    "wallsBroken": 1,
+    "remainingPlayerHp": 190,
+    "remainingEnemyHp": 0
+  },
+  "score": [0, 0, 17, 5, 78]
+}

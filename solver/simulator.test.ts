@@ -39,7 +39,7 @@ test('saved Chapter 4 solution replays the event-derived rout exactly', {
     metrics: SolverMetrics;
     score: number[];
   };
-  scenario.seed = saved.seed;
+  assert.equal(saved.seed, scenario.seed);
   const { db } = await loadSolverProject(projectPath);
   const result = new TacticalSimulator(db, scenario, saved.policy).run();
 
@@ -50,7 +50,7 @@ test('saved Chapter 4 solution replays the event-derived rout exactly', {
   assert.equal(result.metrics.enemiesDefeated + result.metrics.wallsBroken, 23);
 });
 
-test('parallel seed search matches sequential seed search', {
+test('non-benchmark parallel seed diagnostic matches its sequential implementation', {
   skip: !existsSync(projectPath),
 }, async () => {
   const scenario = JSON.parse(await readFile('solver/scenarios/chapter-4.json', 'utf8')) as SolverScenario;
@@ -66,7 +66,7 @@ test('parallel seed search matches sequential seed search', {
   assert.deepEqual(parallel.metrics, sequential.metrics);
 });
 
-test('saved Chapter 3 seed-selected solution remains a zero-damage clear', {
+test('saved Chapter 3 fixed-seed solution remains a no-death clear', {
   skip: !existsSync(projectPath),
 }, async () => {
   const scenario = JSON.parse(await readFile(scenarioPath, 'utf8')) as SolverScenario;
@@ -76,13 +76,13 @@ test('saved Chapter 3 seed-selected solution remains a zero-damage clear', {
     metrics: SolverMetrics;
     score: number[];
   };
-  scenario.seed = saved.seed;
+  assert.equal(saved.seed, scenario.seed);
   const { db } = await loadSolverProject(projectPath);
   const result = new TacticalSimulator(db, scenario, saved.policy).run();
 
   assert.deepEqual(result.score, saved.score);
   assert.deepEqual(result.metrics, saved.metrics);
-  assert.equal(result.metrics.damageTaken, 0);
+  assert.equal(result.metrics.damageTaken, 19);
   assert.equal(result.metrics.playerDeaths, 0);
   assert.equal(result.metrics.cleared, true);
 });

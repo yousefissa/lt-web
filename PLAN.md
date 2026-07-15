@@ -111,33 +111,43 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 ### Recent Changes
 
+- **Fixed-seed benchmark contract correction:**
+  - Made the scenario seed part of the immutable benchmark instance; canonical
+    Chapter 3/4 solutions now use seeds 3/4 respectively.
+  - CLI verification and continuation reject solution/scenario seed mismatches.
+  - `--seed-range` now requires `--allow-seed-search` and emits a non-benchmark
+    warning; seed-selected artifacts are retained only as diagnostic history.
+  - Canonical results are currently Chapter 3: 6 turns/0 deaths/19 damage and
+    Chapter 4: 5 turns/0 deaths/22 damage.
+
 - **Generalized objectives/events + Chapter 4 rout solution:**
   - Added automatic seize/rout/defeat-boss objective inference and rout-aware
     progress, completion, and incomplete-run scoring.
   - Added a standard LT event adapter for level-start unit/group placement,
     stat/tag changes, scripted combat, and turn/region group reinforcements.
   - Added scenario-derived unit policy dimensions and per-unit risk multipliers.
-  - Parallelized seed-range scanning across worker threads in addition to policy
-    hill climbing, with regression coverage against the sequential result.
-  - Added `chapter-4.json` plus verified fixed-seed and seed-selected solutions:
-    seed 211 clears in 5 turns with 0 deaths/17 damage; fixed seed 4 clears in
-    5 turns with 0 deaths/22 damage.
+  - Parallelized diagnostic seed-range scanning across worker threads in
+    addition to policy hill climbing, with regression coverage against the
+    sequential implementation.
+  - Added `chapter-4.json` plus a verified fixed-seed solution: seed 4 clears in
+    5 turns with 0 deaths/22 damage. Seed 211's 17-damage result is retained only
+    as explicitly non-benchmark diagnostic history.
   - Added Chapter 4 adapter/integration tests and fixed magic-equation parity
     discovered through Artur's intro combat.
 
-- **Deterministic headless level solver + Chapter 3 zero-damage solution:**
+- **Deterministic headless level solver + Chapter 3 solution:**
   - Added `solver/` CLI that directly loads `.ltproj` JSON and reuses engine
     `Database`, `UnitObject`, `ItemObject`, `GameBoard`, `PathSystem`,
     `AIController`, combat calculations, and `CombatPhaseSolver`.
   - Added scenario control for roster selection, unit level/EXP, inventories,
     stat overrides, RNG seed/mode, max turns, and explicit scripted spawns.
   - Added `inspect`, `run`, `solve`, and `verify` workflows, deterministic
-    seed-range search, hill-climbing policy mutations, and worker-thread shards.
+    diagnostic seed-range search, hill-climbing policy mutations, and worker-thread shards.
   - Added replay JSON plus standalone/inline animated map visualization output.
-  - Checked in `solver/solutions/chapter-3.json`: seed 115, 6 turns,
-    0 player damage, 0 deaths, 10 enemies defeated, 3 walls broken.
-  - Preserved a fixed-seed comparison in `chapter-3-seed-3.json`: 6 turns,
-    19 damage, 0 deaths, showing policy improvement separately from seed search.
+  - Checked in canonical `solver/solutions/chapter-3.json`: fixed seed 3,
+    6 turns, 19 player damage, 0 deaths, 10 enemies defeated, 3 walls broken.
+  - Preserved seed 115's zero-damage route only as non-benchmark diagnostic
+    history in `chapter-3-seed-selected.json`.
   - Added solver unit/integration tests and a separate solver typecheck config.
   - Added seeded gameplay RNG control to combat, level-ups, and the browser harness.
   - Fixed class-learned skill installation and LT serialized combat component
