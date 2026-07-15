@@ -11,6 +11,7 @@ export interface TeamUnitConfig {
   exp?: number;
   items?: string[];
   stats?: Record<string, number>;
+  position?: Position;
 }
 
 export interface ScriptedSpawn {
@@ -34,6 +35,10 @@ export interface SolverScenario {
   eventAdapter?: SolverEventAdapter;
   team: Record<string, TeamUnitConfig>;
   scriptedSpawns?: ScriptedSpawn[];
+  requiredVisits?: string[];
+  requiredRecruitments?: string[];
+  requiredChests?: string[];
+  requiredDoors?: string[];
   notes?: string[];
 }
 
@@ -53,7 +58,8 @@ export interface PolicyWeights {
   unitRisk?: Record<string, number>;
 }
 
-export type SolverActionType = 'attack' | 'move' | 'wait' | 'heal' | 'seize' | 'spawn';
+export type SolverActionType = 'attack' | 'move' | 'wait' | 'heal' | 'seize' | 'spawn'
+  | 'visit' | 'talk' | 'chest' | 'door' | 'interact';
 
 export interface StrikeRecord {
   attacker: string;
@@ -134,9 +140,11 @@ export interface SolverResult {
   /** Explicit action route for planner-produced solutions. */
   plan?: PlannerAction[];
   planner?: BeamSearchStats;
+  interactions: SolverInteractionState;
 }
 
-export type PlannerActionType = 'attack' | 'heal' | 'move' | 'wait' | 'seize';
+export type PlannerActionType = 'attack' | 'heal' | 'move' | 'wait' | 'seize'
+  | 'visit' | 'talk' | 'chest' | 'door';
 
 /** A fully specified, deterministic player action emitted by the simulator. */
 export interface PlannerAction {
@@ -148,6 +156,7 @@ export interface PlannerAction {
   item?: string;
   /** Inventory slot, used to distinguish duplicate copies of the same item. */
   itemIndex?: number;
+  region?: string;
   /** Greedy policy estimate used only for branch ordering, never legality. */
   heuristic: number;
 }
@@ -211,14 +220,33 @@ export interface TacticalCheckpoint {
   initialPlayerHp: number;
   metrics: SolverMetrics;
   firedEventRules: string[];
+  activeRegions: string[];
+  visibleLayers: string[];
+  completedInteractions: string[];
+  visitedRegions: string[];
+  openedChests: string[];
+  openedDoors: string[];
+  destroyedRegions: string[];
   units: TacticalUnitCheckpoint[];
   replay?: ReplayStep[];
+}
+
+export interface SolverInteractionState {
+  visitedRegions: string[];
+  openedChests: string[];
+  openedDoors: string[];
+  destroyedRegions: string[];
+  recruitedUnits: string[];
+  requirementsSatisfied: boolean;
 }
 
 export interface BeamSearchOptions extends LegalActionOptions {
   beamWidth: number;
   branchLimit: number;
   maxNodes: number;
+  /** Fraction of the beam reserved for death/damage-first states (0..1). */
+  damageFrontierRatio: number;
+  maxPlayerDeaths?: number;
   onProgress?: (stats: BeamSearchStats, incumbent: SolverResult) => void;
 }
 
@@ -226,6 +254,8 @@ export interface BeamSearchStats {
   beamWidth: number;
   branchLimit: number;
   maxNodes: number;
+  damageFrontierRatio: number;
+  maxPlayerDeaths?: number;
   nodesGenerated: number;
   nodesAccepted: number;
   cacheHits: number;

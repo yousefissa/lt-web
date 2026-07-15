@@ -44,3 +44,82 @@ test('Chapter 4 intro effects leave the scripted Mogall dead and boss configured
   assert.equal(boss?.maxHp, 39);
   assert.deepEqual(artur?.position, [7, 3]);
 });
+
+test('standard adapter derives reusable visit, talk, door, chest, and destructible rules', {
+  skip: !existsSync(projectPath),
+}, async () => {
+  const { db } = await loadSolverProject(projectPath);
+  const chapter5 = buildStandardEventPlan(db, db.levels.get('5')!);
+  assert.deepEqual(
+    chapter5.interactionRules.filter((rule) => rule.type === 'visit').map((rule) => rule.regionNid).sort(),
+    ['Village1', 'Village2', 'Village3', 'Village4'],
+  );
+  assert.ok(chapter5.interactionRules.some(
+    (rule) => rule.type === 'talk' && rule.actorNid === 'Natasha' && rule.targetNid === 'Joshua',
+  ));
+  assert.equal(chapter5.interactionRules.filter((rule) => rule.type === 'destructible').length, 4);
+
+  const chapter3 = buildStandardEventPlan(db, db.levels.get('3')!);
+  assert.equal(chapter3.interactionRules.filter((rule) => rule.type === 'chest').length, 4);
+  assert.equal(chapter3.interactionRules.filter((rule) => rule.type === 'door').length, 3);
+});
+
+test('planner interactions consume unlock uses, grant rewards, and recruit directionally', {
+  skip: !existsSync(projectPath),
+}, async () => {
+  const { db } = await loadSolverProject(projectPath);
+  const chestScenario: SolverScenario = {
+    name: 'Chapter 3 chest fixture',
+    levelNid: '3',
+    seed: 3,
+    maxTurns: 1,
+    objective: 'seize',
+    eventAdapter: 'standard',
+    team: {
+      Colm: { level: 3, items: ['Iron_Sword', 'Lockpick'], position: [6, 12] },
+    },
+  };
+  const chestSimulator = new TacticalSimulator(db, chestScenario);
+  chestSimulator.beginPlayerTurn();
+  const chest = chestSimulator.enumerateLegalActions().find(
+    (action) => action.type === 'chest' && action.actor === 'Colm' && action.region === 'Chest1',
+  );
+  assert.ok(chest);
+  chestSimulator.applyPlayerAction(chest);
+  const colm = chestSimulator.getResult().finalUnits.find((unit) => unit.nid === 'Colm');
+  assert.ok(colm?.items.some((item) => item.nid === 'Javelin'));
+  assert.equal(colm?.items.find((item) => item.nid === 'Lockpick')?.uses, 14);
+  assert.deepEqual(chestSimulator.getResult().interactions.openedChests, ['Chest1']);
+
+  const chapter5Base: SolverScenario = {
+    name: 'Chapter 5 interaction fixture',
+    levelNid: '5',
+    seed: 5,
+    maxTurns: 1,
+    objective: 'defeat_boss',
+    bossNid: 'Saar',
+    eventAdapter: 'standard',
+    team: {
+      Eirika: { level: 5, items: ['Rapier'], position: [12, 19] },
+      Natasha: { level: 1, items: ['Heal'], position: [9, 8] },
+    },
+  };
+  const visitSimulator = new TacticalSimulator(db, chapter5Base);
+  visitSimulator.beginPlayerTurn();
+  const visit = visitSimulator.enumerateLegalActions().find(
+    (action) => action.type === 'visit' && action.actor === 'Eirika' && action.region === 'Village1',
+  );
+  assert.ok(visit);
+  visitSimulator.applyPlayerAction(visit);
+  assert.ok(visitSimulator.getResult().finalUnits.find((unit) => unit.nid === 'Eirika')
+    ?.items.some((item) => item.nid === 'Dragonshield'));
+
+  const talkSimulator = new TacticalSimulator(db, chapter5Base);
+  talkSimulator.beginPlayerTurn();
+  const talk = talkSimulator.enumerateLegalActions().find(
+    (action) => action.type === 'talk' && action.actor === 'Natasha' && action.target === 'Joshua',
+  );
+  assert.ok(talk);
+  talkSimulator.applyPlayerAction(talk);
+  assert.deepEqual(talkSimulator.getResult().interactions.recruitedUnits, ['Joshua']);
+});

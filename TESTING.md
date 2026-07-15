@@ -73,6 +73,8 @@ npm run solver:typecheck
 npm run solver -- verify --solution solver/solutions/chapter-3.json
 npm run solver -- verify --scenario solver/scenarios/chapter-4.json \
   --solution solver/solutions/chapter-4.json
+npm run solver -- verify --scenario solver/scenarios/chapter-5.json \
+  --solution solver/solutions/chapter-5.json
 ```
 
 Project-backed integration tests are skipped when `lt-maker/default.ltproj` is
@@ -90,6 +92,10 @@ npm run solver -- plan --scenario solver/scenarios/chapter-4.json \
 `plan` never scans gameplay seeds. It branches over validated player actions,
 restores exact RNG-bearing checkpoints, rejects transpositions by a canonical
 state digest, and verifies saved routes by replaying the explicit action list.
+`--max-deaths 0` prunes a search to survival routes, while `--prefix FILE`
+continues from a validated turn-stamped action prefix without changing RNG.
+Interaction coverage derives Chapter 5 visits/Natasha→Joshua/destructible
+villages and Chapter 3 chest/door rules, including lockpick use and rewards.
 
 ### Sacred Stones Reliability Soak
 

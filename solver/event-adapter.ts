@@ -19,10 +19,22 @@ export interface EventGroupSpawnRule {
   trigger: EventSpawnTrigger;
 }
 
+export type EventInteractionType = 'visit' | 'chest' | 'door' | 'talk' | 'destructible';
+
+export interface EventInteractionRule {
+  id: string;
+  type: EventInteractionType;
+  commands: ParsedEventCommand[];
+  regionNid?: string;
+  actorNid?: string;
+  targetNid?: string;
+}
+
 export interface StandardEventPlan {
   events: EventPrefab[];
   initialCommands: ParsedEventCommand[];
   spawnRules: EventGroupSpawnRule[];
+  interactionRules: EventInteractionRule[];
 }
 
 export function parseEventCommand(raw: string): ParsedEventCommand | null {
@@ -65,7 +77,40 @@ export function buildStandardEventPlan(db: Database, level: LevelPrefab): Standa
   const initialCommands = events
     .filter((event) => event.trigger === 'level_start' && isAlwaysCondition(event.condition))
     .flatMap((event) => event._source.map(parseEventCommand).filter(isPresent));
-  return { events, initialCommands, spawnRules: deriveGroupSpawnRules(events) };
+  return {
+    events,
+    initialCommands,
+    spawnRules: deriveGroupSpawnRules(events),
+    interactionRules: deriveInteractionRules(events, level),
+  };
+}
+
+export function deriveInteractionRules(events: EventPrefab[], level: LevelPrefab): EventInteractionRule[] {
+  const rules: EventInteractionRule[] = [];
+  for (const event of events) {
+    const trigger = event.trigger.toLowerCase();
+    const commands = event._source.map(parseEventCommand).filter(isPresent);
+    if (trigger === 'on_talk') {
+      const actor = event.condition.match(/unit\.nid\s*==\s*['"]([^'"]+)['"]/i)?.[1];
+      const target = event.condition.match(/unit2\.nid\s*==\s*['"]([^'"]+)['"]/i)?.[1];
+      if (actor && target) {
+        rules.push({ id: event.nid, type: 'talk', actorNid: actor, targetNid: target, commands });
+      }
+      continue;
+    }
+
+    const type = normalizeInteractionType(trigger);
+    if (!type) continue;
+    const conditionRegion = event.condition.match(/region\.nid\s*==\s*['"]([^'"]+)['"]/i)?.[1];
+    const region = level.regions.find((candidate) =>
+      candidate.sub_nid.toLowerCase() === trigger
+      && (candidate.nid === event.name || candidate.nid === conditionRegion),
+    ) ?? level.regions.find((candidate) =>
+      candidate.sub_nid.toLowerCase() === trigger && candidate.nid === event.name,
+    );
+    if (region) rules.push({ id: event.nid, type, regionNid: region.nid, commands });
+  }
+  return rules;
 }
 
 export function deriveGroupSpawnRules(events: EventPrefab[]): EventGroupSpawnRule[] {
@@ -129,6 +174,12 @@ function parseTrigger(condition: string): EventSpawnTrigger | null {
 
 function isAlwaysCondition(condition: string): boolean {
   return ['true', '1'].includes(condition.trim().toLowerCase());
+}
+
+function normalizeInteractionType(trigger: string): EventInteractionType | null {
+  if (trigger === 'visit' || trigger === 'chest' || trigger === 'door'
+    || trigger === 'destructible') return trigger;
+  return null;
 }
 
 function clonePosition(position: [number, number] | null | undefined): [number, number] | null {

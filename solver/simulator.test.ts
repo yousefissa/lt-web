@@ -160,3 +160,26 @@ test('beam search remains on the scenario seed and returns a replayable incumben
   assert.deepEqual(replayed.score, searched.result.score);
   assert.deepEqual(replayed.metrics, searched.result.metrics);
 });
+
+test('saved Chapter 5 fixed-seed plan recruits Joshua and clears without deaths', {
+  skip: !existsSync(projectPath),
+}, async () => {
+  const scenario = JSON.parse(await readFile('solver/scenarios/chapter-5.json', 'utf8')) as SolverScenario;
+  const saved = JSON.parse(await readFile('solver/solutions/chapter-5.json', 'utf8')) as {
+    seed: number;
+    policy: PolicyWeights;
+    plan: PlannerAction[];
+    metrics: SolverMetrics;
+    score: number[];
+  };
+  assert.equal(saved.seed, scenario.seed);
+  const { db } = await loadSolverProject(projectPath);
+  const result = replayPlannedSolution(db, scenario, saved.policy, saved.plan);
+
+  assert.deepEqual(result.score, saved.score);
+  assert.deepEqual(result.metrics, saved.metrics);
+  assert.equal(result.metrics.playerDeaths, 0);
+  assert.equal(result.metrics.cleared, true);
+  assert.deepEqual(result.interactions.recruitedUnits, ['Joshua']);
+  assert.equal(result.interactions.requirementsSatisfied, true);
+});

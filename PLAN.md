@@ -9,7 +9,7 @@ Lex Talionis Python/Pygame engine.
 ## Current State
 
 **88 engine source files, ~46,500 lines of TypeScript, plus 13 solver files
-(~3,200 lines).**
+(~4,000 lines).**
 Builds cleanly with zero type errors. All four development phases (Foundation,
 Playable, Visual Polish, Mobile/Distribution) are complete. The engine loads
 `.ltproj` game data over HTTP and runs at 60 fps on Canvas 2D with dynamic
@@ -110,6 +110,27 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
   resolves, matching Python's synchronous behavior and preventing async race frames.
 
 ### Recent Changes
+
+- **Chapter 5 fixed-seed solver + reusable map interactions:**
+  - Generalized standard events into legal `visit`, directional `talk`, `chest`,
+    and `door` actions plus enemy `Destructible` interactions. Event effects
+    support item rewards/removal, team/AI changes, one-shot regions, visited
+    state, unlock-use consumption, and tilemap layer changes.
+  - Added scenario deployment positions and optional required visits,
+    recruitments, chests, and doors. These requirements participate in clear
+    detection and incomplete-state scoring instead of being hidden policy hints.
+  - Extended checkpoints/transposition identity with active regions, visible
+    layers, completed interactions, opened/visited/destroyed sets, and recruited
+    team state. Added Chapter 3 chest/door and Chapter 5 visit/recruitment tests.
+  - Added danger-aware heal destinations, survival-frontier tuning,
+    `--max-deaths`, and deterministic `--prefix` continuation. Prefix search
+    found the canonical seed-5 Chapter 5 clear: Joshua recruited, Saar defeated,
+    Village 2 visited, 4 turns/0 deaths/53 damage/65 actions. A further 150,000
+    full-root nodes (132,073 accepted; 15,075 cache hits) did not improve it.
+  - Added an all-content Chapter 5 stress fixture requiring all four villages
+    and Joshua. Its verified incumbent is 5 turns/1 death/66 damage after the
+    initial clear plus 210,000 continuation nodes; it remains an optimization
+    target and is not conflated with the native-objective benchmark.
 
 - **Cloneable tactical planner foundation:**
   - Added versioned simulator checkpoints covering the exact RNG stream, turn

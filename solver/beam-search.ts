@@ -15,6 +15,7 @@ export const DEFAULT_BEAM_OPTIONS: BeamSearchOptions = {
   beamWidth: 32,
   branchLimit: 12,
   maxNodes: 30_000,
+  damageFrontierRatio: 0.35,
   maxMovesPerUnit: 4,
   maxAttacksPerUnit: 4,
   maxHealsPerUnit: 2,
@@ -35,23 +36,31 @@ export function beamSearchFixedSeed(
   scenario: SolverScenario,
   policy: PolicyWeights = DEFAULT_POLICY,
   requested: Partial<BeamSearchOptions> = {},
+  providedIncumbent?: SolverResult,
+  prefix: PlannerAction[] = [],
 ): BeamSearchResult {
   const options: BeamSearchOptions = { ...DEFAULT_BEAM_OPTIONS, ...requested };
   validateOptions(options);
   const started = performance.now();
 
-  let incumbent = runGreedyPlannedSolution(db, scenario, policy);
+  const greedy = runGreedyPlannedSolution(db, scenario, policy);
+  const verifiedProvided = providedIncumbent?.plan
+    ? replayPlannedSolution(db, scenario, providedIncumbent.policy, providedIncumbent.plan)
+    : providedIncumbent;
+  let incumbent = verifiedProvided && compareScores(verifiedProvided.score, greedy.score) < 0
+    ? verifiedProvided
+    : greedy;
   const guidePlan = incumbent.plan ?? [];
-  let incumbentSource: BeamSearchStats['incumbentSource'] = 'greedy';
-  const rootSimulator = new TacticalSimulator(db, scenario, policy);
-  rootSimulator.beginPlayerTurn();
+  let incumbentSource: BeamSearchStats['incumbentSource'] = incumbent === greedy ? 'greedy' : 'beam';
+  const rootSimulator = createSimulatorFromPlan(db, scenario, policy, prefix);
+  if (!rootSimulator.isTerminal()) rootSimulator.beginPlayerTurn();
   rootSimulator.restoreCheckpoint(rootSimulator.createCheckpoint(false));
   const root: BeamNode = {
     simulator: rootSimulator,
-    plan: [],
+    plan: structuredClone(prefix),
     score: rootSimulator.getEvaluationScore(),
     heuristic: 0,
-    guide: true,
+    guide: prefix.every((action, index) => actionKey(action) === actionKey(guidePlan[index])),
   };
   let frontier: BeamNode[] = [root];
   const transpositions = new Set<string>([rootSimulator.getTranspositionKey()]);
@@ -59,6 +68,8 @@ export function beamSearchFixedSeed(
     beamWidth: options.beamWidth,
     branchLimit: options.branchLimit,
     maxNodes: options.maxNodes,
+    damageFrontierRatio: options.damageFrontierRatio,
+    maxPlayerDeaths: options.maxPlayerDeaths,
     nodesGenerated: 0,
     nodesAccepted: 1,
     cacheHits: 0,
@@ -89,6 +100,8 @@ export function beamSearchFixedSeed(
         }
 
         const score = simulator.getEvaluationScore();
+        if (options.maxPlayerDeaths !== undefined
+          && simulator.getPlayerDeaths() > options.maxPlayerDeaths) continue;
         if (simulator.isTerminal()) {
           const result = { ...simulator.getResult(), plan };
           if (result.metrics.cleared && compareScores(result.score, incumbent.score) < 0) {
@@ -116,7 +129,7 @@ export function beamSearchFixedSeed(
       }
     }
 
-    frontier = selectFrontier(candidates, options.beamWidth);
+    frontier = selectFrontier(candidates, options.beamWidth, options.damageFrontierRatio);
     stats.frontierPeak = Math.max(stats.frontierPeak, frontier.length);
     stats.incumbentSource = incumbentSource;
     stats.elapsedMs = performance.now() - started;
@@ -141,6 +154,17 @@ export function replayPlannedSolution(
   plan: PlannerAction[],
 ): SolverResult {
   const started = performance.now();
+  const simulator = createSimulatorFromPlan(db, scenario, policy, plan);
+  const result = simulator.getResult(performance.now() - started);
+  return { ...result, plan: structuredClone(plan) };
+}
+
+function createSimulatorFromPlan(
+  db: Database,
+  scenario: SolverScenario,
+  policy: PolicyWeights,
+  plan: PlannerAction[],
+): TacticalSimulator {
   const simulator = new TacticalSimulator(db, scenario, policy);
   for (let index = 0; index < plan.length; index++) {
     const action = plan[index];
@@ -154,8 +178,7 @@ export function replayPlannedSolution(
     simulator.applyPlayerAction(action);
     if (simulator.isPlayerTurnComplete() && !simulator.isTerminal()) simulator.finishTurn();
   }
-  const result = simulator.getResult(performance.now() - started);
-  return { ...result, plan: structuredClone(plan) };
+  return simulator;
 }
 
 /** Express the legacy greedy policy as a deterministic, replayable action plan. */
@@ -203,7 +226,9 @@ function selectDiverseBranches(
     actors.add(action.actor);
     add(action);
   }
-  for (const preferredType of ['wait', 'move', 'attack', 'heal', 'seize'] as const) {
+  for (const preferredType of [
+    'visit', 'talk', 'chest', 'door', 'heal', 'attack', 'move', 'wait', 'seize',
+  ] as const) {
     const actorTypes = new Set<string>();
     for (const action of actions) {
       if (action.type !== preferredType || actorTypes.has(action.actor)) continue;
@@ -222,7 +247,7 @@ function selectDiverseBranches(
 }
 
 function actionKey(action: PlannerAction): string {
-  return `${action.turn}:${action.actor}:${action.type}:${action.target ?? ''}:${action.itemIndex ?? ''}:${action.position.join(',')}`;
+  return `${action.turn}:${action.actor}:${action.type}:${action.target ?? ''}:${action.region ?? ''}:${action.itemIndex ?? ''}:${action.position.join(',')}`;
 }
 
 function compareNodes(a: BeamNode, b: BeamNode): number {
@@ -233,14 +258,14 @@ function compareNodes(a: BeamNode, b: BeamNode): number {
 }
 
 function compareDamageNodes(a: BeamNode, b: BeamNode): number {
-  const aDamageFirst = [a.score[0], a.score[1], a.score[2], a.score[5], a.score[3], a.score[4]];
-  const bDamageFirst = [b.score[0], b.score[1], b.score[2], b.score[5], b.score[3], b.score[4]];
+  const aDamageFirst = [a.score[0], a.score[1], a.score[2], a.score[5]];
+  const bDamageFirst = [b.score[0], b.score[1], b.score[2], b.score[5]];
   return compareScores(aDamageFirst, bDamageFirst)
     || b.heuristic - a.heuristic
     || compareNodes(a, b);
 }
 
-function selectFrontier(candidates: BeamNode[], width: number): BeamNode[] {
+function selectFrontier(candidates: BeamNode[], width: number, damageRatio: number): BeamNode[] {
   if (candidates.length <= width) return candidates.sort(compareNodes);
   const selected: BeamNode[] = [];
   const seen = new Set<BeamNode>();
@@ -253,8 +278,8 @@ function selectFrontier(candidates: BeamNode[], width: number): BeamNode[] {
 
   const objectiveOrdered = [...candidates].sort(compareNodes);
   const damageOrdered = [...candidates].sort(compareDamageNodes);
-  for (const node of objectiveOrdered.slice(0, Math.ceil(width * 0.55))) add(node);
-  for (const node of damageOrdered.slice(0, Math.ceil(width * 0.35))) add(node);
+  for (const node of objectiveOrdered.slice(0, Math.ceil(width * (1 - damageRatio)))) add(node);
+  for (const node of damageOrdered.slice(0, Math.ceil(width * damageRatio))) add(node);
   for (const node of objectiveOrdered) add(node);
 
   const guide = candidates.find((candidate) => candidate.guide);
@@ -277,5 +302,13 @@ function validateOptions(options: BeamSearchOptions): void {
     maxNodes: options.maxNodes,
   })) {
     if (!Number.isInteger(value) || value <= 0) throw new Error(`${name} must be a positive integer`);
+  }
+  if (!Number.isFinite(options.damageFrontierRatio)
+    || options.damageFrontierRatio < 0 || options.damageFrontierRatio > 1) {
+    throw new Error('damageFrontierRatio must be between 0 and 1');
+  }
+  if (options.maxPlayerDeaths !== undefined
+    && (!Number.isInteger(options.maxPlayerDeaths) || options.maxPlayerDeaths < 0)) {
+    throw new Error('maxPlayerDeaths must be a non-negative integer');
   }
 }

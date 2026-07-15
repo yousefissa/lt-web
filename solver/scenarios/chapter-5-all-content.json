@@ -1,0 +1,30 @@
+{
+  "name": "Sacred Stones Ch. 5: The Empire's Reach (all villages + Joshua)",
+  "project": "lt-maker/default.ltproj",
+  "levelNid": "5",
+  "seed": 5,
+  "rngMode": "true_hit",
+  "maxTurns": 16,
+  "objective": "defeat_boss",
+  "bossNid": "Saar",
+  "eventAdapter": "standard",
+  "requiredVisits": ["Village1", "Village2", "Village3", "Village4"],
+  "requiredRecruitments": ["Joshua"],
+  "team": {
+    "Eirika": { "level": 6, "exp": 20, "items": ["Rapier", "Vulnerary"], "position": [4, 17] },
+    "Natasha": { "level": 2, "exp": 0, "items": ["Heal", "Vulnerary"], "position": [5, 18] },
+    "Seth": { "level": 1, "exp": 50, "items": ["Steel_Sword", "Silver_Lance", "Vulnerary"], "position": [3, 16] },
+    "Gilliam": { "level": 7, "exp": 20, "items": ["Iron_Lance", "Vulnerary"], "position": [3, 18] },
+    "Vanessa": { "level": 5, "exp": 20, "items": ["Slim_Lance", "Javelin", "Vulnerary"], "position": [4, 19] },
+    "Moulder": { "level": 6, "exp": 30, "items": ["Heal", "Vulnerary"], "position": [6, 19] },
+    "Ross": { "level": 6, "exp": 50, "items": ["Hatchet", "Vulnerary"], "position": [7, 18] },
+    "Neimi": { "level": 4, "exp": 20, "items": ["Iron_Bow", "Vulnerary"], "position": [6, 17] },
+    "Artur": { "level": 3, "exp": 0, "items": ["Lightning", "Vulnerary"], "position": [5, 16] }
+  },
+  "notes": [
+    "The gameplay RNG seed is fixed at 5 and is never searched.",
+    "Fixed-growth levels approximate experience gained through Chapters 0-4.",
+    "This stress benchmark strengthens the chapter objective: recruit Joshua, visit all four villages, then defeat Saar.",
+    "The first verified clear is 5 turns/1 death/66 damage after 210,000 continuation nodes; it remains an optimization target."
+  ]
+}

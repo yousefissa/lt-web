@@ -36,6 +36,8 @@ npm run solver -- plan --scenario solver/scenarios/chapter-4.json \
 npm run solver -- verify --solution solver/solutions/chapter-3.json
 npm run solver -- verify --scenario solver/scenarios/chapter-4.json \
   --solution solver/solutions/chapter-4.json
+npm run solver -- verify --scenario solver/scenarios/chapter-5.json \
+  --solution solver/solutions/chapter-5.json
 ```
 
 The canonical Chapter 3 benchmark fixes seed `3` and clears in 6 turns with
@@ -54,5 +56,14 @@ candidates without changing the gameplay RNG stream.
 Seed-range scanning is deliberately excluded from benchmark results. The CLI
 requires `--allow-seed-search` alongside `--seed-range` and labels that path as
 non-benchmark diagnostic work.
+
+The canonical Chapter 5 benchmark fixes seed `5`, requires Natasha to recruit
+Joshua, and defeats Saar in 4 turns with zero deaths and 53 cumulative damage;
+it also visits Village 2. The separate `chapter-5-all-content.json` stress
+scenario requires all four villages plus Joshua and has a verified 5-turn,
+1-death, 66-damage incumbent. The reusable interaction adapter derives visits,
+talk recruitment, destructible villages, doors, and chests from LT events;
+unlock actions enforce item/class conditions, consume uses, grant event rewards,
+and apply terrain-layer changes.
 
 See [TESTING.md](./TESTING.md) for solver and browser regression commands.

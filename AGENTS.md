@@ -436,7 +436,9 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
   overrides, RNG seed/mode, turn cap, objective mode, standard event adapter,
   and any remaining explicit spawns
 - **Event adapter**: Infers seize/rout objectives and applies common level-start
-  unit/group/stat/tag/scripted-combat effects plus turn/region group reinforcements
+  unit/group/stat/tag/scripted-combat effects plus turn/region group
+  reinforcements. It also derives visits, directional talks/recruitment,
+  doors/chests, unlock consumption/rewards, and destructible-region AI effects.
 - **Search**: Deterministic fixed-seed hill climbing with multi-core policy
   shards plus action-level beam search with bounded per-actor branching,
   objective/damage frontier diversity, protected incumbent prefixes, and a
@@ -445,8 +447,10 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
   non-benchmark diagnostics.
 - **Planner state**: Versioned checkpoints and independent clones preserve RNG,
   turn/event lifecycle, metrics, unit flags/stats/positions, inventories/uses,
-  and replay state. Legal player actions are enumerable and validated one at a
-  time, with deterministic enemy/other phase stepping and cache-stable keys.
+  active regions/layers/interactions, and replay state. Legal player actions are
+  enumerable and validated one at a time, with deterministic enemy/other phase
+  stepping and cache-stable keys. Search supports zero-death pruning and exact
+  action-prefix continuation.
 - **Replay**: Every action records a state snapshot for JSON verification and an
   interactive grid animation
 - **Chapter 3 result**: Canonical fixed seed 3 route clears in 6 turns with zero
@@ -455,6 +459,10 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
   event-derived rout objective in 5 turns/82 total actions with zero deaths and
   22 damage, including Turn 2 and lower-map trigger reinforcements. Two
   80,000-node beam configurations did not find sub-22; this is not a proof.
+- **Chapter 5 result**: Canonical fixed seed 5 explicit plan recruits Joshua,
+  visits Village 2, and defeats Saar in 4 turns/65 actions with zero deaths and
+  53 damage. The all-four-villages stress fixture has a separate verified
+  5-turn/1-death/66-damage incumbent.
 
 ---
 
@@ -563,8 +571,8 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
 | `search.ts` | Seed scans, policy mutation, hill climbing, result ordering |
 | `parallel-search.ts` / `worker.ts` | Multi-core search sharding |
 | `visualize.ts` | Standalone and Codex-inline replay renderers |
-| `scenarios/chapter-{3,4}.json` | Controllable roster/loadout/seed/event fixtures |
-| `solutions/chapter-{3,4}.json` | Canonical verifiable fixed-seed policies |
+| `scenarios/chapter-{3,4,5}.json` | Controllable roster/loadout/seed/event/interaction fixtures |
+| `solutions/chapter-{3,4,5}.json` | Canonical verifiable fixed-seed policies/plans |
 | `solutions/*-seed-selected.json` | Explicitly non-benchmark RNG diagnostics |
 
 ---

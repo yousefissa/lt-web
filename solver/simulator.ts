@@ -17,6 +17,7 @@ import type {
   GenericUnitData,
   KlassDef,
   LevelPrefab,
+  RegionData,
   TilemapData,
   UniqueUnitData,
   UnitPrefab,
@@ -34,6 +35,7 @@ import {
   inferObjectiveType,
   parsePosition,
   resolveGroupPosition,
+  type EventInteractionRule,
   type EventGroupSpawnRule,
   type ParsedEventCommand,
 } from './event-adapter';
@@ -46,6 +48,7 @@ import type {
   ReplayStep,
   SolverActionType,
   SolverMetrics,
+  SolverInteractionState,
   SolverObjectiveType,
   SolverPhase,
   SolverResult,
@@ -110,7 +113,7 @@ function manhattan(a: Position, b: Position): number {
   return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
 }
 
-function clonePosition(position: Position | null): Position | null {
+function clonePosition(position: Position | null | undefined): Position | null {
   return position ? [position[0], position[1]] : null;
 }
 
@@ -176,6 +179,14 @@ export class TacticalSimulator {
   private eventSpawnRules: EventGroupSpawnRule[];
   private firedEventRules: Set<string>;
   private playerPhasePrepared: boolean;
+  private interactionRules: EventInteractionRule[];
+  private activeRegions: Set<string>;
+  private visibleLayers: Set<string>;
+  private completedInteractions: Set<string>;
+  private visitedRegions: Set<string>;
+  private openedChests: Set<string>;
+  private openedDoors: Set<string>;
+  private destroyedRegions: Set<string>;
 
   constructor(db: Database, scenario: SolverScenario, policy: PolicyWeights = DEFAULT_POLICY) {
     this.db = db;
@@ -194,6 +205,7 @@ export class TacticalSimulator {
     this.tilemap = tilemap;
 
     this.board = new GameBoard(tilemap.size[0], tilemap.size[1]);
+    this.visibleLayers = new Set(tilemap.layers.filter((layer) => layer.visible).map((layer) => layer.nid));
     this.initializeTerrain();
     this.pathSystem = new PathSystem(db);
     this.rng = new SeededRandom(scenario.seed);
@@ -211,16 +223,24 @@ export class TacticalSimulator {
     this.eventSpawnRules = scenario.eventAdapter === 'standard' ? eventPlan.spawnRules : [];
     this.firedEventRules = new Set();
     this.playerPhasePrepared = false;
+    this.interactionRules = scenario.eventAdapter === 'standard' ? eventPlan.interactionRules : [];
+    this.activeRegions = new Set(level.regions.map((region) => region.nid));
+    this.completedInteractions = new Set();
+    this.visitedRegions = new Set();
+    this.openedChests = new Set();
+    this.openedDoors = new Set();
+    this.destroyedRegions = new Set();
 
     this.seizePosition = this.findSeizePosition();
     this.spawnInitialUnits();
     if (scenario.eventAdapter === 'standard') this.applyInitialEventCommands(eventPlan.initialCommands);
+    this.spawnConfiguredTeamUnits();
 
     this.aiController = new AIController(db, this.board, this.pathSystem);
     this.aiController.gameRef = {
       board: this.board,
       db: this.db,
-      currentLevel: this.level,
+      currentLevel: this.levelWithActiveRegions(),
       gameVars: new Map<string, unknown>(),
       levelVars: new Map<string, unknown>(),
       supports: null,
@@ -286,6 +306,7 @@ export class TacticalSimulator {
       replay: this.replay,
       finalUnits: this.snapshotUnits(),
       elapsedMs,
+      interactions: this.interactionSnapshot(),
     };
   }
 
@@ -317,6 +338,10 @@ export class TacticalSimulator {
     return this.currentTurn;
   }
 
+  getPlayerDeaths(): number {
+    return this.metrics.playerDeaths;
+  }
+
   getEvaluationScore(): number[] {
     this.updateDerivedMetrics();
     return this.buildScore();
@@ -337,7 +362,7 @@ export class TacticalSimulator {
 
     for (const unit of active) {
       const original = clonePosition(unit.position)!;
-      const validMoves = this.pathSystem.getValidMoves(unit, this.board);
+      const validMoves = this.getPlannerValidMoves(unit);
       const unitActions: PlannerAction[] = [];
 
       if (this.objectiveType === 'seize' && this.seizePosition && unit.tags.includes('Lord')) {
@@ -349,6 +374,59 @@ export class TacticalSimulator {
             position: clonePosition(this.seizePosition)!,
             heuristic: Number.MAX_SAFE_INTEGER,
           });
+        }
+      }
+
+      for (const rule of this.interactionRules) {
+        if (this.completedInteractions.has(rule.id)) continue;
+        if (rule.type === 'talk') {
+          if (rule.actorNid !== unit.nid || !rule.targetNid) continue;
+          const target = this.units.get(rule.targetNid);
+          if (!target?.position || target.isDead()) continue;
+          for (const position of validMoves) {
+            if (manhattan(position, target.position) !== 1) continue;
+            unitActions.push({
+              type: 'talk',
+              turn: this.currentTurn,
+              actor: unit.nid,
+              target: target.nid,
+              position: clonePosition(position)!,
+              heuristic: this.interactionHeuristic('talk', undefined, target.nid, original, position),
+            });
+          }
+          continue;
+        }
+        if (rule.type === 'destructible' || !rule.regionNid || !this.activeRegions.has(rule.regionNid)) continue;
+        if (rule.type === 'visit' && this.destroyedRegions.has(rule.regionNid)) continue;
+        const region = this.level.regions.find((candidate) => candidate.nid === rule.regionNid);
+        if (!region) continue;
+        for (const position of validMoves) {
+          if (!regionContains(region, position)) continue;
+          if (rule.type === 'visit') {
+            unitActions.push({
+              type: 'visit',
+              turn: this.currentTurn,
+              actor: unit.nid,
+              region: region.nid,
+              position: clonePosition(position)!,
+              heuristic: this.interactionHeuristic('visit', region.nid, undefined, original, position),
+            });
+          } else {
+            for (let itemIndex = 0; itemIndex < unit.items.length; itemIndex++) {
+              const item = unit.items[itemIndex];
+              if (!this.itemCanUnlock(unit, item, region)) continue;
+              unitActions.push({
+                type: rule.type,
+                turn: this.currentTurn,
+                actor: unit.nid,
+                region: region.nid,
+                item: item.nid,
+                itemIndex,
+                position: clonePosition(position)!,
+                heuristic: this.interactionHeuristic(rule.type, region.nid, undefined, original, position),
+              });
+            }
+          }
         }
       }
 
@@ -395,6 +473,9 @@ export class TacticalSimulator {
               item.getHealAmount(unit.getStatValue('MAG')),
             );
             if (amount <= 0) continue;
+            this.board.moveUnit(unit, position[0], position[1]);
+            const danger = this.expectedDanger(unit);
+            this.board.moveUnit(unit, original[0], original[1]);
             heals.push({
               type: 'heal',
               turn: this.currentTurn,
@@ -404,7 +485,8 @@ export class TacticalSimulator {
               itemIndex,
               position: clonePosition(position)!,
               heuristic: amount * this.policy.heal
-                + this.objectiveProgress(original, position) * this.policy.progress,
+                + this.objectiveProgress(original, position, unit) * this.policy.progress
+                - danger * this.policy.danger * (this.policy.unitRisk?.[unit.nid] ?? 1),
             });
           }
         }
@@ -415,7 +497,7 @@ export class TacticalSimulator {
       const moves: PlannerAction[] = [];
       for (const position of validMoves) {
         if (samePosition(position, original)) continue;
-        const progress = this.objectiveProgress(original, position);
+        const progress = this.objectiveProgress(original, position, unit);
         this.board.moveUnit(unit, position[0], position[1]);
         const danger = this.expectedDanger(unit);
         this.board.moveUnit(unit, original[0], original[1]);
@@ -467,6 +549,13 @@ export class TacticalSimulator {
         heuristic: seize.score,
       };
     }
+    const interaction = this.enumerateLegalActions({
+      maxMovesPerUnit: 0,
+      maxAttacksPerUnit: 0,
+      maxHealsPerUnit: 0,
+      includeWait: false,
+    }).find((action) => this.isRequiredInteractionAction(action));
+    if (interaction) return interaction;
     const attack = this.findBestAttack(active);
     if (attack) {
       return {
@@ -525,7 +614,7 @@ export class TacticalSimulator {
     if (!unit?.position || unit.isDead() || unit.finished || unit.team !== 'player') {
       throw new Error(`Inactive player unit: ${action.actor}`);
     }
-    const validMoves = this.pathSystem.getValidMoves(unit, this.board);
+    const validMoves = this.getPlannerValidMoves(unit);
     if (!validMoves.some((position) => samePosition(position, action.position))) {
       throw new Error(`Illegal destination ${action.position.join(',')} for ${action.actor}`);
     }
@@ -545,6 +634,9 @@ export class TacticalSimulator {
       this.moveAndFinish(unit, action.position, 'seize');
       this.cleared = true;
       this.recordStep('seize', `${unit.name} seizes the throne`, unit, unit.position);
+    } else if (action.type === 'visit' || action.type === 'talk'
+      || action.type === 'chest' || action.type === 'door') {
+      this.executePlayerInteraction(unit, action);
     } else {
       const item = action.itemIndex === undefined ? undefined : unit.items[action.itemIndex];
       const target = action.target ? this.units.get(action.target) : undefined;
@@ -604,6 +696,13 @@ export class TacticalSimulator {
       initialPlayerHp: this.initialPlayerHp,
       metrics: { ...this.metrics },
       firedEventRules: Array.from(this.firedEventRules).sort(),
+      activeRegions: Array.from(this.activeRegions).sort(),
+      visibleLayers: Array.from(this.visibleLayers).sort(),
+      completedInteractions: Array.from(this.completedInteractions).sort(),
+      visitedRegions: Array.from(this.visitedRegions).sort(),
+      openedChests: Array.from(this.openedChests).sort(),
+      openedDoors: Array.from(this.openedDoors).sort(),
+      destroyedRegions: Array.from(this.destroyedRegions).sort(),
       units: Array.from(this.units.values()).map((unit) => this.checkpointUnit(unit))
         .sort((a, b) => a.nid.localeCompare(b.nid)),
       replay: includeReplay ? structuredClone(this.replay) : undefined,
@@ -648,9 +747,18 @@ export class TacticalSimulator {
     this.initialPlayerHp = checkpoint.initialPlayerHp;
     this.metrics = { ...checkpoint.metrics };
     this.firedEventRules = new Set(checkpoint.firedEventRules);
+    this.activeRegions = new Set(checkpoint.activeRegions);
+    this.visibleLayers = new Set(checkpoint.visibleLayers);
+    this.completedInteractions = new Set(checkpoint.completedInteractions);
+    this.visitedRegions = new Set(checkpoint.visitedRegions);
+    this.openedChests = new Set(checkpoint.openedChests);
+    this.openedDoors = new Set(checkpoint.openedDoors);
+    this.destroyedRegions = new Set(checkpoint.destroyedRegions);
     this.replay = checkpoint.replay ? structuredClone(checkpoint.replay) : [];
     this.rng.setState(checkpoint.rngState);
     this.dangerMoveCache.clear();
+    this.rebuildTerrain();
+    this.syncAiRegions();
   }
 
   clone(includeReplay = true): TacticalSimulator {
@@ -697,7 +805,7 @@ export class TacticalSimulator {
 
   private initializeTerrain(): void {
     for (const layer of this.tilemap.layers) {
-      if (!layer.visible) continue;
+      if (!this.visibleLayers.has(layer.nid)) continue;
       for (const [key, terrainNid] of Object.entries(layer.terrain_grid)) {
         const [x, y] = key.split(',').map(Number);
         this.board.setTerrain(x, y, terrainNid);
@@ -717,6 +825,31 @@ export class TacticalSimulator {
       if (data.team === 'player' && this.scenario.team[data.nid]?.enabled === false) continue;
       if (!data.starting_position) continue;
       this.spawnLevelUnit(data, data.team, data.starting_position);
+    }
+  }
+
+  private spawnConfiguredTeamUnits(): void {
+    const formations = this.level.regions
+      .filter((region) => region.region_type.toLowerCase() === 'formation')
+      .map((region) => clonePosition(region.position)!)
+      .filter((position) => !this.board.isOccupied(position[0], position[1]));
+
+    for (const [nid, config] of Object.entries(this.scenario.team)) {
+      if (config.enabled === false) continue;
+      let unit = this.units.get(nid);
+      if (!unit) {
+        const prefab = this.db.units.get(nid);
+        if (!prefab) throw new Error(`Unknown configured team unit: ${nid}`);
+        const position = clonePosition(config.position) ?? formations.shift() ?? null;
+        if (!position) throw new Error(`Configured team unit ${nid} needs a position or free formation slot`);
+        unit = this.spawnFromPrefab(prefab, 'player', position, 'None', config) ?? undefined;
+      } else if (unit.team === 'player' && config.position) {
+        const occupant = this.board.getUnit(config.position[0], config.position[1]);
+        if (occupant && occupant !== unit) {
+          throw new Error(`Configured position ${config.position.join(',')} is occupied by ${occupant.nid}`);
+        }
+        this.board.moveUnit(unit, config.position[0], config.position[1]);
+      }
     }
   }
 
@@ -964,6 +1097,7 @@ export class TacticalSimulator {
 
   private runAiPhase(phase: 'enemy' | 'other'): void {
     this.currentPhase = phase;
+    this.syncAiRegions();
     const units = this.unitsByTeam(phase)
       .filter((unit) => unit.position && !unit.isDead())
       .sort((a, b) => (this.db.ai.get(b.ai)?.priority ?? 0) - (this.db.ai.get(a.ai)?.priority ?? 0));
@@ -1023,6 +1157,21 @@ export class TacticalSimulator {
       this.board.moveUnit(unit, destination[0], destination[1]);
     }
 
+    if (action.type === 'interact' && action.regionNid && this.activeRegions.has(action.regionNid)) {
+      const rule = this.interactionRules.find(
+        (candidate) => candidate.type === 'destructible'
+          && candidate.regionNid === action.regionNid
+          && !this.completedInteractions.has(candidate.id),
+      );
+      const region = this.level.regions.find((candidate) => candidate.nid === action.regionNid);
+      if (rule && region) {
+        this.executeInteractionRule(rule, unit, region);
+        this.metrics.actions++;
+        this.recordStep('interact', `${unit.name} interacts with ${region.nid}`, unit, unit.position);
+        return;
+      }
+    }
+
     if (action.type === 'attack' && action.targetUnit && action.item) {
       if (action.item.canHeal() && this.db.areAllied(unit.team, action.targetUnit.team)) {
         const amount = Math.min(
@@ -1050,7 +1199,7 @@ export class TacticalSimulator {
     if (this.objectiveType !== 'seize' || !this.seizePosition || this.board.isOccupied(this.seizePosition[0], this.seizePosition[1])) return null;
     for (const unit of active) {
       if (!unit.tags.includes('Lord')) continue;
-      const valid = this.pathSystem.getValidMoves(unit, this.board);
+      const valid = this.getPlannerValidMoves(unit);
       if (valid.some((position) => position[0] === this.seizePosition![0] && position[1] === this.seizePosition![1])) {
         return { unit, position: this.seizePosition, score: Infinity };
       }
@@ -1062,7 +1211,7 @@ export class TacticalSimulator {
     this.dangerMoveCache.clear();
     let best: AttackCandidate | null = null;
     for (const unit of active) {
-      const validMoves = this.pathSystem.getValidMoves(unit, this.board);
+      const validMoves = this.getPlannerValidMoves(unit);
       for (const item of unit.items.filter((candidate) => candidate.isWeapon() && candidate.hasUsesRemaining())) {
         for (const target of this.hostileUnits(unit)) {
           if (!target.position) continue;
@@ -1092,7 +1241,7 @@ export class TacticalSimulator {
     const canKill = perHit * attacks >= target.currentHp;
     const counter = this.expectedCounterDamage(target, unit, distanceBetween(target, unit));
     const danger = this.expectedDanger(unit);
-    const progress = this.objectiveProgress(original, position);
+    const progress = this.objectiveProgress(original, position, unit);
 
     let score = expected * this.policy.damage + progress * this.policy.progress;
     score -= counter * this.policy.counterDamage;
@@ -1110,9 +1259,10 @@ export class TacticalSimulator {
 
   private findBestHeal(active: UnitObject[]): HealCandidate | null {
     let best: HealCandidate | null = null;
+    this.dangerMoveCache.clear();
     const injured = this.playerUnits().filter((unit) => unit.position && !unit.isDead() && unit.currentHp < unit.maxHp);
     for (const unit of active) {
-      const validMoves = this.pathSystem.getValidMoves(unit, this.board);
+      const validMoves = this.getPlannerValidMoves(unit);
       for (const item of unit.items.filter((candidate) => candidate.canHeal() && candidate.hasUsesRemaining())) {
         const targets = item.isSpell() ? injured : injured.filter((target) => target === unit);
         for (const target of targets) {
@@ -1122,7 +1272,13 @@ export class TacticalSimulator {
             if (item.isSpell() && (distance < item.getMinRange() || distance > item.getMaxRange())) continue;
             const amount = Math.min(target.maxHp - target.currentHp, item.getHealAmount(unit.getStatValue('MAG')));
             if (amount <= 0) continue;
-            const score = amount * this.policy.heal + this.objectiveProgress(unit.position!, position) * this.policy.progress;
+            const original = clonePosition(unit.position)!;
+            this.board.moveUnit(unit, position[0], position[1]);
+            const danger = this.expectedDanger(unit);
+            this.board.moveUnit(unit, original[0], original[1]);
+            const score = amount * this.policy.heal
+              + this.objectiveProgress(original, position, unit) * this.policy.progress
+              - danger * this.policy.danger * (this.policy.unitRisk?.[unit.nid] ?? 1);
             if (!best || score > best.score) best = { unit, target, item, position, amount, score };
           }
         }
@@ -1137,8 +1293,8 @@ export class TacticalSimulator {
     for (const unit of active) {
       if (!unit.position) continue;
       const original = clonePosition(unit.position)!;
-      for (const position of this.pathSystem.getValidMoves(unit, this.board)) {
-        const progress = this.objectiveProgress(original, position);
+      for (const position of this.getPlannerValidMoves(unit)) {
+        const progress = this.objectiveProgress(original, position, unit);
         this.board.moveUnit(unit, position[0], position[1]);
         const danger = this.expectedDanger(unit);
         this.board.moveUnit(unit, original[0], original[1]);
@@ -1233,6 +1389,109 @@ export class TacticalSimulator {
     );
   }
 
+  private executePlayerInteraction(unit: UnitObject, action: PlannerAction): void {
+    const rule = this.interactionRules.find((candidate) => {
+      if (this.completedInteractions.has(candidate.id)) return false;
+      if (action.type === 'talk') {
+        return candidate.type === 'talk' && candidate.actorNid === unit.nid
+          && candidate.targetNid === action.target;
+      }
+      return candidate.type === action.type && candidate.regionNid === action.region;
+    });
+    if (!rule) throw new Error(`No active ${action.type} event for ${unit.nid}`);
+    const region = rule.regionNid
+      ? this.level.regions.find((candidate) => candidate.nid === rule.regionNid)
+      : undefined;
+    if (region && (!this.activeRegions.has(region.nid) || !regionContains(region, action.position))) {
+      throw new Error(`Inactive or mismatched region: ${region.nid}`);
+    }
+    if (action.type === 'talk') {
+      const target = action.target ? this.units.get(action.target) : undefined;
+      if (!target?.position || manhattan(action.position, target.position) !== 1) {
+        throw new Error(`Talk target is not adjacent: ${action.target}`);
+      }
+    }
+
+    const from = clonePosition(unit.position);
+    this.board.moveUnit(unit, action.position[0], action.position[1]);
+    unit.hasMoved = unit.hasMoved || !samePosition(from, action.position);
+    if (action.type === 'talk') unit.hasTraded = true;
+
+    if (action.type === 'chest' || action.type === 'door') {
+      const item = action.itemIndex === undefined ? undefined : unit.items[action.itemIndex];
+      if (!item || item.nid !== action.item || !region || !this.itemCanUnlock(unit, item, region)) {
+        throw new Error(`Invalid unlock item for ${action.type} ${action.region}`);
+      }
+      item.decrementUses();
+    }
+
+    this.executeInteractionRule(rule, unit, region);
+    this.metrics.actions++;
+    const label = action.type === 'talk'
+      ? `${unit.name} talks to ${this.units.get(action.target ?? '')?.name ?? action.target}`
+      : `${unit.name} uses ${action.type} at ${action.region}`;
+    this.recordStep(action.type, label, unit, action.position, this.units.get(action.target ?? ''),
+      action.itemIndex === undefined ? undefined : unit.items[action.itemIndex], undefined, from);
+  }
+
+  private executeInteractionRule(
+    rule: EventInteractionRule,
+    actor: UnitObject,
+    region?: RegionData,
+  ): void {
+    this.completedInteractions.add(rule.id);
+    if (region?.only_once) this.activeRegions.delete(region.nid);
+    if (rule.type === 'visit' && region) this.visitedRegions.add(region.nid);
+    if (rule.type === 'chest' && region) this.openedChests.add(region.nid);
+    if (rule.type === 'door' && region) this.openedDoors.add(region.nid);
+    if (rule.type === 'destructible' && region) {
+      const destroyed = region.nid.startsWith('Destroy') ? region.nid.slice('Destroy'.length) : region.nid;
+      this.destroyedRegions.add(destroyed);
+    }
+
+    for (const command of rule.commands) this.applyInteractionCommand(command, actor);
+    this.syncAiRegions();
+  }
+
+  private applyInteractionCommand(command: ParsedEventCommand, actor: UnitObject): void {
+    const args = command.args.map((value) => value.replaceAll('{unit}', actor.nid));
+    const [first, second] = args;
+    if (command.nid === 'give_item') {
+      const recipient = this.units.get(first) ?? actor;
+      const prefab = this.db.items.get(second);
+      if (!prefab) return;
+      const item = new ItemObject(prefab);
+      item.owner = recipient;
+      recipient.items.push(item);
+    } else if (command.nid === 'remove_item') {
+      const recipient = this.units.get(first) ?? actor;
+      const index = recipient.items.findIndex((item) => item.nid === second);
+      if (index >= 0) recipient.items.splice(index, 1);
+    } else if (command.nid === 'change_team') {
+      const unit = this.units.get(first);
+      if (!unit || !second) return;
+      unit.team = second;
+      if (unit.position) this.board.moveUnit(unit, unit.position[0], unit.position[1]);
+    } else if (command.nid === 'change_ai') {
+      const unit = this.units.get(first);
+      if (unit && second) unit.ai = second;
+    } else if (command.nid === 'remove_region') {
+      this.activeRegions.delete(first);
+    } else if (command.nid === 'show_layer') {
+      this.setLayerVisibility(first, true);
+    } else if (command.nid === 'hide_layer') {
+      this.setLayerVisibility(first, false);
+    } else if (command.nid === 'has_visited' || command.nid === 'has_finished') {
+      actor.hasTraded = true;
+      actor.finished = true;
+    } else if (command.nid === 'has_traded') {
+      actor.hasTraded = true;
+    } else if (command.nid === 'has_attacked') {
+      actor.hasAttacked = true;
+      actor.finished = true;
+    }
+  }
+
   private moveAndFinish(unit: UnitObject, position: Position, type: 'move' | 'seize'): void {
     const from = clonePosition(unit.position);
     this.board.moveUnit(unit, position[0], position[1]);
@@ -1281,7 +1540,114 @@ export class TacticalSimulator {
     return danger;
   }
 
-  private objectiveProgress(from: Position, to: Position): number {
+  private getPlannerValidMoves(unit: UnitObject): Position[] {
+    if (!unit.position) return [];
+    if (unit.hasMoved || unit.hasTraded) return [clonePosition(unit.position)!];
+    return this.pathSystem.getValidMoves(unit, this.board);
+  }
+
+  private interactionHeuristic(
+    type: 'visit' | 'talk' | 'chest' | 'door',
+    regionNid: string | undefined,
+    targetNid: string | undefined,
+    from: Position,
+    to: Position,
+  ): number {
+    const required = type === 'visit'
+      ? !!regionNid && (this.scenario.requiredVisits ?? []).includes(regionNid)
+      : type === 'chest'
+        ? !!regionNid && (this.scenario.requiredChests ?? []).includes(regionNid)
+        : type === 'door'
+          ? !!regionNid && (this.scenario.requiredDoors ?? []).includes(regionNid)
+          : !!targetNid && (this.scenario.requiredRecruitments ?? []).includes(targetNid);
+    return (required ? 10_000 : type === 'talk' ? 800 : 300)
+      + this.objectiveProgress(from, to) * this.policy.progress;
+  }
+
+  private isRequiredInteractionAction(action: PlannerAction): boolean {
+    if (action.type === 'visit') return !!action.region
+      && (this.scenario.requiredVisits ?? []).includes(action.region);
+    if (action.type === 'chest') return !!action.region
+      && (this.scenario.requiredChests ?? []).includes(action.region);
+    if (action.type === 'door') return !!action.region
+      && (this.scenario.requiredDoors ?? []).includes(action.region);
+    if (action.type === 'talk') return !!action.target
+      && (this.scenario.requiredRecruitments ?? []).includes(action.target);
+    return false;
+  }
+
+  private itemCanUnlock(unit: UnitObject, item: ItemObject, region: RegionData): boolean {
+    if (!item.hasUsesRemaining() || !item.hasComponent('can_unlock')) return false;
+    const requiredClasses = item.getComponent<string[]>('prf_class');
+    if (Array.isArray(requiredClasses) && requiredClasses.length > 0 && !requiredClasses.includes(unit.klass)) {
+      return false;
+    }
+    const condition = String(item.getComponent('can_unlock') ?? '').trim();
+    if (!condition || condition.toLowerCase() === 'true') return true;
+    const startsWith = condition.match(/region\.nid\.startswith\(\s*['"]([^'"]+)['"]\s*\)/i)?.[1];
+    if (startsWith) return region.nid.startsWith(startsWith);
+    const equals = condition.match(/region\.nid\s*==\s*['"]([^'"]+)['"]/i)?.[1];
+    return equals ? region.nid === equals : false;
+  }
+
+  private setLayerVisibility(nid: string, visible: boolean): void {
+    if (!nid || !this.tilemap.layers.some((layer) => layer.nid === nid)) return;
+    if (visible) this.visibleLayers.add(nid);
+    else this.visibleLayers.delete(nid);
+    this.rebuildTerrain();
+  }
+
+  private rebuildTerrain(): void {
+    for (const layer of this.tilemap.layers) {
+      if (!this.visibleLayers.has(layer.nid)) continue;
+      for (const [key, terrainNid] of Object.entries(layer.terrain_grid)) {
+        const [x, y] = key.split(',').map(Number);
+        this.board.setTerrain(x, y, terrainNid);
+      }
+    }
+  }
+
+  private levelWithActiveRegions(): LevelPrefab {
+    return {
+      ...this.level,
+      regions: this.level.regions.filter((region) => this.activeRegions.has(region.nid)),
+    };
+  }
+
+  private syncAiRegions(): void {
+    if (this.aiController?.gameRef) this.aiController.gameRef.currentLevel = this.levelWithActiveRegions();
+  }
+
+  private requiredObjectivePositions(unit?: UnitObject): Position[] {
+    if (unit) {
+      for (const targetNid of this.scenario.requiredRecruitments ?? []) {
+        const target = this.units.get(targetNid);
+        if (!target?.position || target.team === 'player') continue;
+        const talk = this.interactionRules.find(
+          (rule) => rule.type === 'talk' && rule.targetNid === targetNid && rule.actorNid === unit.nid,
+        );
+        if (talk) return [clonePosition(target.position)!];
+      }
+    }
+    const regionNids = [
+      ...(this.scenario.requiredVisits ?? []).filter((nid) => !this.visitedRegions.has(nid)),
+      ...(this.scenario.requiredChests ?? []).filter((nid) => !this.openedChests.has(nid)),
+      ...(this.scenario.requiredDoors ?? []).filter((nid) => !this.openedDoors.has(nid)),
+    ];
+    const positions = regionNids
+      .map((nid) => this.level.regions.find((region) => region.nid === nid)?.position)
+      .filter((position): position is Position => !!position)
+      .map((position) => clonePosition(position)!);
+    return positions;
+  }
+
+  private objectiveProgress(from: Position, to: Position, unit?: UnitObject): number {
+    const required = this.requiredObjectivePositions(unit);
+    if (required.length > 0) {
+      const distanceFrom = Math.min(...required.map((position) => manhattan(from, position)));
+      const distanceTo = Math.min(...required.map((position) => manhattan(to, position)));
+      return distanceFrom - distanceTo;
+    }
     if (this.objectiveType === 'seize') {
       if (!this.seizePosition) return 0;
       return manhattan(from, this.seizePosition) - manhattan(to, this.seizePosition);
@@ -1310,17 +1676,19 @@ export class TacticalSimulator {
   private refreshOutcome(): void {
     const lord = this.units.get('Eirika') ?? this.playerUnits().find((unit) => unit.tags.includes('Lord'));
     this.lost = !lord || lord.isDead();
+    let baseObjectiveComplete = false;
     if (this.objectiveType === 'seize' && this.seizePosition) {
       const occupant = this.board.getUnit(this.seizePosition[0], this.seizePosition[1]);
-      this.cleared = !!occupant && occupant.team === 'player' && occupant.tags.includes('Lord');
+      baseObjectiveComplete = !!occupant && occupant.team === 'player' && occupant.tags.includes('Lord');
     } else if (this.objectiveType === 'rout') {
-      this.cleared = this.enemyUnits().every((unit) => !unit.position || unit.isDead());
+      baseObjectiveComplete = this.enemyUnits().every((unit) => !unit.position || unit.isDead());
     } else if (this.objectiveType === 'defeat_boss') {
       const boss = this.scenario.bossNid
         ? this.units.get(this.scenario.bossNid)
         : this.enemyUnits().find((unit) => this.isBoss(unit));
-      this.cleared = !!boss && boss.isDead();
+      baseObjectiveComplete = !!boss && boss.isDead();
     }
+    this.cleared = !this.lost && baseObjectiveComplete && this.requirementsRemaining() === 0;
   }
 
   private buildScore(): number[] {
@@ -1339,7 +1707,20 @@ export class TacticalSimulator {
         : this.enemyUnits().find((unit) => this.isBoss(unit));
       objectiveRemaining = boss?.currentHp ?? 999;
     }
+    objectiveRemaining += this.requirementsRemaining() * 1000;
     return [1, this.lost ? 1 : 0, this.metrics.playerDeaths, objectiveRemaining, this.metrics.remainingEnemyHp, this.metrics.damageTaken];
+  }
+
+  private requirementsRemaining(): number {
+    let remaining = 0;
+    for (const nid of this.scenario.requiredVisits ?? []) if (!this.visitedRegions.has(nid)) remaining++;
+    for (const nid of this.scenario.requiredChests ?? []) if (!this.openedChests.has(nid)) remaining++;
+    for (const nid of this.scenario.requiredDoors ?? []) if (!this.openedDoors.has(nid)) remaining++;
+    for (const nid of this.scenario.requiredRecruitments ?? []) {
+      const unit = this.units.get(nid);
+      if (!unit || unit.team !== 'player' || unit.isDead()) remaining++;
+    }
+    return remaining;
   }
 
   private isWall(unit: UnitObject): boolean {
@@ -1473,6 +1854,24 @@ export class TacticalSimulator {
       .sort((a, b) => a.team.localeCompare(b.team) || a.nid.localeCompare(b.nid));
   }
 
+  private interactionSnapshot(): SolverInteractionState {
+    const recruitedUnits = Array.from(this.units.values())
+      .filter((unit) => {
+        const initial = this.level.units.find((candidate) => candidate.nid === unit.nid);
+        return initial && initial.team !== 'player' && unit.team === 'player';
+      })
+      .map((unit) => unit.nid)
+      .sort();
+    return {
+      visitedRegions: Array.from(this.visitedRegions).sort(),
+      openedChests: Array.from(this.openedChests).sort(),
+      openedDoors: Array.from(this.openedDoors).sort(),
+      destroyedRegions: Array.from(this.destroyedRegions).sort(),
+      recruitedUnits,
+      requirementsSatisfied: this.requirementsRemaining() === 0,
+    };
+  }
+
   private mapSnapshot(): MapSnapshot {
     const terrain: string[][] = [];
     const terrainNames: Record<string, string> = {};
@@ -1538,4 +1937,11 @@ function comparePlannerActions(a: PlannerAction, b: PlannerAction): number {
 function limitActions(actions: PlannerAction[], limit: number | undefined): PlannerAction[] {
   if (limit === undefined) return actions;
   return actions.slice(0, Math.max(0, limit));
+}
+
+function regionContains(region: RegionData, position: Position): boolean {
+  return position[0] >= region.position[0]
+    && position[1] >= region.position[1]
+    && position[0] < region.position[0] + region.size[0]
+    && position[1] < region.position[1] + region.size[1];
 }

@@ -24,6 +24,8 @@ interface CliOptions {
   beamWidth: number;
   branchLimit: number;
   maxNodes: number;
+  damageFrontierRatio: number;
+  maxPlayerDeaths?: number;
   maxMovesPerUnit: number;
   maxAttacksPerUnit: number;
   maxHealsPerUnit: number;
@@ -32,6 +34,7 @@ interface CliOptions {
   htmlPath?: string;
   fragmentPath?: string;
   solutionPath?: string;
+  prefixPath?: string;
   json: boolean;
 }
 
@@ -70,6 +73,9 @@ async function main(): Promise<void> {
     const matches = compareResults(rerun, saved) === 0 && JSON.stringify(rerun.metrics) === JSON.stringify(saved.metrics);
     console.log(formatSummary(rerun));
     if (!matches) throw new Error(`Verification mismatch: saved [${saved.score}] rerun [${rerun.score}]`);
+    if (options.outputPath) await writeJson(options.outputPath, rerun);
+    if (options.htmlPath) await writeReplayHtml(options.htmlPath, rerun);
+    if (options.fragmentPath) await writeReplayFragment(options.fragmentPath, rerun);
     console.log('verification: deterministic replay matches saved solution');
     return;
   }
@@ -80,16 +86,29 @@ async function main(): Promise<void> {
       throw new Error('plan searches actions for exactly one fixed seed; seed search is not supported');
     }
     let startingPolicy: PolicyWeights = DEFAULT_POLICY;
+    let startingSolution: SolverResult | undefined;
+    let prefix: import('./types').PlannerAction[] = [];
     if (options.solutionPath) {
       const saved = JSON.parse(await readFile(path.resolve(options.solutionPath), 'utf8')) as SolverResult;
       assertFixedSeed(scenario.seed, saved.seed, options);
       startingPolicy = saved.policy;
+      startingSolution = saved;
+    }
+    if (options.prefixPath) {
+      const saved = JSON.parse(await readFile(path.resolve(options.prefixPath), 'utf8')) as {
+        seed: number;
+        plan: import('./types').PlannerAction[];
+      };
+      assertFixedSeed(scenario.seed, saved.seed, options);
+      prefix = saved.plan;
     }
     let reportedTurn = 0;
     const planned = beamSearchFixedSeed(db, scenario, startingPolicy, {
       beamWidth: options.beamWidth,
       branchLimit: options.branchLimit,
       maxNodes: options.maxNodes,
+      damageFrontierRatio: options.damageFrontierRatio,
+      maxPlayerDeaths: options.maxPlayerDeaths,
       maxMovesPerUnit: options.maxMovesPerUnit,
       maxAttacksPerUnit: options.maxAttacksPerUnit,
       maxHealsPerUnit: options.maxHealsPerUnit,
@@ -101,7 +120,7 @@ async function main(): Promise<void> {
           + `incumbent=[${incumbent.score.join(', ')}] source=${stats.incumbentSource}`,
         );
       },
-    });
+    }, startingSolution, prefix);
     result = planned.result;
     console.error(
       `beam complete: ${planned.stats.nodesGenerated} nodes, ${planned.stats.cacheHits} cache hits, `
@@ -180,6 +199,7 @@ function parseArgs(args: string[]): CliOptions {
     beamWidth: 32,
     branchLimit: 12,
     maxNodes: 30_000,
+    damageFrontierRatio: 0.35,
     maxMovesPerUnit: 4,
     maxAttacksPerUnit: 4,
     maxHealsPerUnit: 2,
@@ -200,6 +220,8 @@ function parseArgs(args: string[]): CliOptions {
     else if (arg === '--beam-width') { options.beamWidth = Number(required(value, arg)); index++; }
     else if (arg === '--branch-limit') { options.branchLimit = Number(required(value, arg)); index++; }
     else if (arg === '--max-nodes') { options.maxNodes = Number(required(value, arg)); index++; }
+    else if (arg === '--damage-frontier') { options.damageFrontierRatio = Number(required(value, arg)); index++; }
+    else if (arg === '--max-deaths') { options.maxPlayerDeaths = Number(required(value, arg)); index++; }
     else if (arg === '--max-moves-per-unit') { options.maxMovesPerUnit = Number(required(value, arg)); index++; }
     else if (arg === '--max-attacks-per-unit') { options.maxAttacksPerUnit = Number(required(value, arg)); index++; }
     else if (arg === '--max-heals-per-unit') { options.maxHealsPerUnit = Number(required(value, arg)); index++; }
@@ -208,6 +230,7 @@ function parseArgs(args: string[]): CliOptions {
     else if (arg === '--html') { options.htmlPath = required(value, arg); index++; }
     else if (arg === '--fragment') { options.fragmentPath = required(value, arg); index++; }
     else if (arg === '--solution') { options.solutionPath = required(value, arg); index++; }
+    else if (arg === '--prefix') { options.prefixPath = required(value, arg); index++; }
     else if (arg === '--json') options.json = true;
     else if (arg === '--help' || arg === '-h') options.command = 'help';
     else throw new Error(`Unknown argument: ${arg}`);
@@ -273,6 +296,7 @@ async function writeSolution(filename: string, result: SolverResult): Promise<vo
     score: result.score,
     plan: result.plan,
     planner: result.planner,
+    interactions: result.interactions,
   };
   await writeFile(resolved, `${JSON.stringify(compact, null, 2)}\n`, 'utf8');
 }
@@ -285,6 +309,8 @@ function formatSummary(result: SolverResult): string {
     `${metrics.turns} turns, ${metrics.actions} actions, ${metrics.combats} combats`,
     `${metrics.damageTaken} damage taken, ${metrics.healingReceived} healed, ${metrics.playerDeaths} player deaths`,
     `${metrics.enemiesDefeated} enemies defeated, ${metrics.wallsBroken} walls broken`,
+    `visits ${result.interactions.visitedRegions.length}, recruits ${result.interactions.recruitedUnits.length}, `
+      + `chests ${result.interactions.openedChests.length}, doors ${result.interactions.openedDoors.length}`,
     `simulation ${result.elapsedMs.toFixed(1)} ms, replay ${result.replay.length} steps`,
   ].join('\n');
 }
@@ -294,7 +320,8 @@ function printHelp(): void {
     `  npm run solver -- inspect [--scenario FILE] [--project PATH]\n` +
     `  npm run solver -- run [--seed N] [--out FILE] [--html FILE] [--json]\n` +
     `  npm run solver -- plan --scenario FILE [--solution FILE] [--beam-width N] [--branch-limit N]\n` +
-    `                         [--max-nodes N] [--solution-out FILE] [--html FILE]\n` +
+    `                         [--max-nodes N] [--damage-frontier 0..1] [--max-deaths N]\n` +
+    `                         [--prefix FILE] [--solution-out FILE] [--html FILE]\n` +
     `  npm run solver -- solve [--iterations N] [--workers N] [--solution FILE] [--solution-out FILE] [--html FILE] [--fragment FILE]\n` +
     `  npm run solver -- verify --solution FILE\n\n` +
     `The scenario seed is a fixed benchmark input. Non-benchmark RNG diagnostics require both --seed-range A:B and --allow-seed-search.`);
