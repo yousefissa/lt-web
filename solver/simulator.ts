@@ -1289,12 +1289,17 @@ export class TacticalSimulator {
 
     if (action.type === 'interact' && action.regionNid && this.activeRegions.has(action.regionNid)) {
       const rule = this.interactionRules.find(
-        (candidate) => candidate.type === 'destructible'
+        (candidate) => candidate.type !== 'talk'
           && candidate.regionNid === action.regionNid
           && !this.completedInteractions.has(candidate.id),
       );
       const region = this.level.regions.find((candidate) => candidate.nid === action.regionNid);
       if (rule && region) {
+        if (rule.type === 'chest' || rule.type === 'door') {
+          const unlock = unit.items.find((item) => this.itemCanUnlock(unit, item, region));
+          if (!unlock) return;
+          unlock.decrementUses();
+        }
         this.executeInteractionRule(rule, unit, region);
         if (!unit.isDead()) unit.hasAttacked = true;
         this.metrics.actions++;

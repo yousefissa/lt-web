@@ -440,7 +440,8 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
   reinforcements. Player, enemy, and other phase turn-change commands execute
   before their matching phases, as in Python LT. It also derives visits, directional talks/recruitment,
   doors/chests, unlock consumption/rewards, destructible-region AI effects,
-  repeatable turn/region triggers, and off-map recruit placement.
+  repeatable turn/region triggers, off-map recruit placement, and regional
+  `Interact` AI for destructibles, doors, and chests.
 - **Search**: Deterministic fixed-seed hill climbing with multi-core policy
   shards plus action-level beam search with bounded per-actor branching,
   objective/damage frontier diversity, protected incumbent prefixes,

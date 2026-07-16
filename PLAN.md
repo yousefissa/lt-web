@@ -139,7 +139,12 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
     `other_turn_change` timing before their respective AI phases, including the
     Placeholder/Colm handoff. The obsolete manifests/results were invalidated;
     fresh Chapter 3/4/5 manifests were regenerated for the corrected engine and
-    will be committed before retraining. Solver tests are 27/27.
+    will be committed before retraining. A second parity pass found that other-
+    team `Interact` AI could reach doors/chests but the headless executor only
+    dispatched destructible rules; it now executes any matching regional event,
+    consumes valid unlock uses, applies layers/regions, and marks the LT
+    interaction action. The manifests were invalidated and regenerated again
+    before the final benchmark run. Solver tests are 27/27.
 
 - **Chapter 5 live differential matrix + exact checkpoint restoration:**
   - Generalized the saved-route Playwright differential into a Chapter 4/5
