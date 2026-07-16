@@ -133,7 +133,13 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
     `solve-seeds`, and `report-policy`.
   - Added regressions for deterministic derivation/tamper rejection, exact
     aggregate scoring, the seed/RNG-free policy boundary, closed-loop
-    determinism, and parallel evaluation coverage. Solver tests are 26/26.
+    determinism, and parallel evaluation coverage.
+  - Live Chapter 3 representative replay exposed missing phase-trigger parity.
+    The standard adapter now handles Python LT's `enemy_turn_change` and
+    `other_turn_change` timing before their respective AI phases, including the
+    Placeholder/Colm handoff. The obsolete manifests/results were invalidated;
+    fresh Chapter 3/4/5 manifests were regenerated for the corrected engine and
+    will be committed before retraining. Solver tests are 27/27.
 
 - **Chapter 5 live differential matrix + exact checkpoint restoration:**
   - Generalized the saved-route Playwright differential into a Chapter 4/5

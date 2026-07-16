@@ -53,6 +53,36 @@ test('Chapter 4 intro effects leave the scripted Mogall dead and boss configured
   assert.deepEqual(artur?.position, [7, 3]);
 });
 
+test('standard adapter runs LT enemy/other turn-change events before each AI phase', {
+  skip: !existsSync(projectPath),
+}, async () => {
+  const { db } = await loadSolverProject(projectPath);
+  const plan = buildStandardEventPlan(db, db.levels.get('3')!);
+  const placeholder = plan.turnRules.find((rule) => rule.id.includes('AddPlaceholder'));
+  const colmArrival = plan.turnRules.find((rule) => rule.id.includes('Turn2'));
+  assert.equal(placeholder?.phase, 'enemy');
+  assert.equal(colmArrival?.phase, 'other');
+  assert.ok(placeholder?.commands.some(
+    (command) => command.nid === 'add_unit' && command.args[0] === 'Placeholder',
+  ));
+  assert.ok(colmArrival?.commands.some(
+    (command) => command.nid === 'remove_unit' && command.args[0] === 'Placeholder',
+  ));
+
+  const scenario = JSON.parse(await readFile('solver/scenarios/chapter-3.json', 'utf8')) as SolverScenario;
+  const simulator = new TacticalSimulator(db, scenario);
+  simulator.beginPlayerTurn();
+  while (!simulator.isPlayerTurnComplete()) {
+    const wait = simulator.enumerateLegalActions().find((action) => action.type === 'wait');
+    assert.ok(wait);
+    simulator.applyPlayerAction(wait);
+  }
+  simulator.finishTurn();
+  const units = simulator.getResult().finalUnits;
+  assert.equal(units.some((unit) => unit.nid === 'Placeholder'), false);
+  assert.deepEqual(units.find((unit) => unit.nid === 'Colm')?.position, [3, 8]);
+});
+
 test('standard adapter derives reusable visit, talk, door, chest, and destructible rules', {
   skip: !existsSync(projectPath),
 }, async () => {

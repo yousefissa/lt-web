@@ -279,15 +279,17 @@ export class TacticalSimulator {
       this.metrics.turns = turn;
 
       this.currentPhase = 'player';
-      this.runEventSpawns();
+      this.runEventSpawns('player');
       this.runScriptedSpawns('player');
       this.runPlayerPhase();
       if (this.cleared || this.lost) break;
 
+      this.runEventSpawns('enemy');
       this.runScriptedSpawns('enemy');
       this.runAiPhase('enemy');
       if (this.cleared || this.lost) break;
 
+      this.runEventSpawns('other');
       this.runScriptedSpawns('other');
       this.runAiPhase('other');
       if (this.cleared || this.lost) break;
@@ -323,7 +325,7 @@ export class TacticalSimulator {
     if (this.currentTurn > this.scenario.maxTurns) return;
     this.metrics.turns = this.currentTurn;
     this.currentPhase = 'player';
-    this.runEventSpawns();
+    this.runEventSpawns('player');
     this.runScriptedSpawns('player');
     for (const unit of this.playerUnits()) unit.resetTurnState();
     this.playerPhasePrepared = true;
@@ -693,10 +695,12 @@ export class TacticalSimulator {
     if (!this.playerPhasePrepared) throw new Error('Player turn has not been prepared');
     if (!this.isPlayerTurnComplete()) throw new Error('Player units still have legal actions');
     if (!this.cleared && !this.lost) {
+      this.runEventSpawns('enemy');
       this.runScriptedSpawns('enemy');
       this.runAiPhase('enemy');
     }
     if (!this.cleared && !this.lost) {
+      this.runEventSpawns('other');
       this.runScriptedSpawns('other');
       this.runAiPhase('other');
     }
@@ -1199,12 +1203,13 @@ export class TacticalSimulator {
     }
   }
 
-  private runEventSpawns(): void {
+  private runEventSpawns(phase: SolverPhase): void {
     for (const rule of this.eventTurnRules) {
-      if (this.firedEventRules.has(rule.id) || rule.turn !== this.currentTurn) continue;
+      if (this.firedEventRules.has(rule.id) || rule.turn !== this.currentTurn || rule.phase !== phase) continue;
       this.firedEventRules.add(rule.id);
       this.applyTurnEventCommands(rule.commands);
     }
+    if (phase !== 'player') return;
     for (const rule of this.eventSpawnRules) {
       if ((rule.onlyOnce && this.firedEventRules.has(rule.id)) || !this.eventSpawnRuleMatches(rule)) continue;
       if (rule.onlyOnce) this.firedEventRules.add(rule.id);

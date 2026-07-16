@@ -437,7 +437,8 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
   and any remaining explicit spawns
 - **Event adapter**: Infers seize/rout objectives and applies common level-start
   unit/group/stat/tag/scripted-combat effects plus turn/region group
-  reinforcements. It also derives visits, directional talks/recruitment,
+  reinforcements. Player, enemy, and other phase turn-change commands execute
+  before their matching phases, as in Python LT. It also derives visits, directional talks/recruitment,
   doors/chests, unlock consumption/rewards, destructible-region AI effects,
   repeatable turn/region triggers, and off-map recruit placement.
 - **Search**: Deterministic fixed-seed hill climbing with multi-core policy
@@ -487,7 +488,7 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
   combat EXP use shared semantics in the solver and both visual combat paths.
 - **Replay**: Every action records a state snapshot for JSON verification and an
   interactive grid animation
-- **Chapter 3 result**: Canonical fixed seed 3 route clears in 6 turns/73
+- **Chapter 3 result**: Canonical fixed seed 3 policy clears in 7 turns/86
   actions with zero deaths and zero damage; this is best-found, not a proof.
 - **Chapter 4 result**: Canonical fixed seed 4 explicit plan clears the
   event-derived rout objective in 6 turns/90 total actions (49 player actions)

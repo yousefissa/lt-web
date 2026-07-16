@@ -1,6 +1,6 @@
 import type { Database } from '../src/data/database';
 import type { EventPrefab, LevelPrefab, RegionData, UnitGroupData } from '../src/data/types';
-import type { SolverObjectiveType } from './types';
+import type { SolverObjectiveType, SolverPhase } from './types';
 
 export interface ParsedEventCommand {
   nid: string;
@@ -23,6 +23,7 @@ export interface EventGroupSpawnRule {
 export interface EventTurnRule {
   id: string;
   turn: number;
+  phase: SolverPhase;
   commands: ParsedEventCommand[];
 }
 
@@ -97,16 +98,25 @@ export function buildStandardEventPlan(db: Database, level: LevelPrefab): Standa
 export function deriveTurnRules(events: EventPrefab[]): EventTurnRule[] {
   const rules: EventTurnRule[] = [];
   for (const event of events) {
-    if (event.trigger !== 'turn_change') continue;
+    const phase = phaseForTurnTrigger(event.trigger);
+    if (!phase) continue;
     const trigger = parseTrigger(event.condition);
     if (trigger?.type !== 'turn') continue;
     rules.push({
-      id: `turn:${event.nid}`,
+      id: `${phase}-turn:${event.nid}`,
       turn: trigger.turn,
+      phase,
       commands: event._source.map(parseEventCommand).filter(isPresent),
     });
   }
   return rules;
+}
+
+function phaseForTurnTrigger(trigger: string): SolverPhase | null {
+  if (trigger === 'turn_change' || trigger === 'player_turn_change') return 'player';
+  if (trigger === 'enemy_turn_change') return 'enemy';
+  if (trigger === 'other_turn_change') return 'other';
+  return null;
 }
 
 export function deriveInteractionRules(events: EventPrefab[], level: LevelPrefab): EventInteractionRule[] {

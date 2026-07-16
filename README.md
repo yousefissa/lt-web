@@ -67,7 +67,7 @@ npm run solver -- solve-seeds --scenario solver/scenarios/chapter-3.json \
   --planner beam --max-nodes 30000 --out solver-output/chapter-3-coverage.json
 ```
 
-The canonical Chapter 3 benchmark fixes seed `3` and clears in 6 turns with
+The canonical Chapter 3 benchmark fixes seed `3` and clears in 7 turns with
 zero deaths and zero damage. Create another scenario under `solver/scenarios/`
 to change the party, level, equipment, events, or objective; its `seed` remains
 part of that fixed problem instance.

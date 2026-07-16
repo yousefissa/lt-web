@@ -5,6 +5,7 @@
   "seed": 3,
   "rngMode": "true_hit",
   "maxTurns": 12,
+  "eventAdapter": "standard",
   "team": {
     "Eirika": { "level": 3, "exp": 40, "items": ["Rapier", "Vulnerary"] },
     "Seth": { "level": 1, "exp": 0, "items": ["Steel_Sword", "Silver_Lance", "Vulnerary"] },
@@ -16,12 +17,9 @@
     "Garcia": { "level": 5, "exp": 20, "items": ["Iron_Axe", "Hand_Axe", "Vulnerary"] },
     "Neimi": { "level": 2, "exp": 10, "items": ["Iron_Bow", "Vulnerary"] }
   },
-  "scriptedSpawns": [
-    { "turn": 1, "phase": "other", "unitNid": "Colm", "team": "other", "position": [0, 5], "moveTo": [2, 4] }
-  ],
   "notes": [
     "Expected fixed growths approximate experience gained in Chapters 0-2.",
     "Chests and Colm recruitment are optional; the optimization objective is a safe seize clear.",
-    "Level-specific scripted spawns are explicit until general EVNT execution is added to the headless simulator."
+    "The standard event adapter executes the enemy/other phase placeholder and Colm arrival rules."
   ]
 }
