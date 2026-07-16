@@ -1,0 +1,300 @@
+{
+  "version": 1,
+  "kind": "global-policy-training",
+  "scenario": "Sacred Stones Ch. 3: The Bandits of Borgo",
+  "levelNid": "3",
+  "scenarioFingerprint": {
+    "version": 1,
+    "scenarioSha256": "32a06bab770d1516d33c4c50f84106ccf830db76a80d0da79d2b6b482d79075d",
+    "projectDataSha256": "a22fb5b668c7c9219bc346ea8d79b34f37f100ab09ba13245fcb0860e0aaf8fc",
+    "engineSourceSha256": "6f22937f7e50dee2990bc39b4962469083191457f9a47cbfb26048a29688e6fe",
+    "instanceSha256": "8f3ad56b9379f0b78773f5ec048bbe1cbc4bbe956fed8750852e7937ad047b48"
+  },
+  "trainManifestFingerprint": "59d316009f30f159824e3ee3d2ff405a1ae33f5044da213502eda89def817670",
+  "validationManifestFingerprint": "86f99cb90a283c8e44b5334a936317b14e22ad3d1e53ea26d4e4a00514b5c9d7",
+  "iterations": 100,
+  "searchSeed": 20260719,
+  "selectedPolicy": {
+    "version": 1,
+    "kind": "deterministic-heuristic",
+    "deterministic": true,
+    "scenarioFingerprint": {
+      "version": 1,
+      "scenarioSha256": "32a06bab770d1516d33c4c50f84106ccf830db76a80d0da79d2b6b482d79075d",
+      "projectDataSha256": "a22fb5b668c7c9219bc346ea8d79b34f37f100ab09ba13245fcb0860e0aaf8fc",
+      "engineSourceSha256": "6f22937f7e50dee2990bc39b4962469083191457f9a47cbfb26048a29688e6fe",
+      "instanceSha256": "8f3ad56b9379f0b78773f5ec048bbe1cbc4bbe956fed8750852e7937ad047b48"
+    },
+    "weights": {
+      "kill": 44.84293910293056,
+      "bossKill": 174.52400288983793,
+      "damage": 2.9258551392014103,
+      "counterDamage": 5,
+      "lethalRisk": 1659.624313531134,
+      "progress": 12.568806095111448,
+      "danger": 3.4124771718959326,
+      "wall": 59.72609417837411,
+      "heal": 5.976332664378403,
+      "stayHealthy": 1.8773574558113595,
+      "unitBias": {
+        "Seth": 18,
+        "Eirika": 5.378480641171336,
+        "Franz": 6,
+        "Gilliam": 11.818417225033045,
+        "Garcia": 3,
+        "Vanessa": 2,
+        "Ross": -2,
+        "Neimi": 4.67485486716032,
+        "Moulder": -8
+      },
+      "unitRisk": {}
+    },
+    "selection": {
+      "trainManifestFingerprint": "59d316009f30f159824e3ee3d2ff405a1ae33f5044da213502eda89def817670",
+      "validationManifestFingerprint": "86f99cb90a283c8e44b5334a936317b14e22ad3d1e53ea26d4e4a00514b5c9d7",
+      "iterations": 100,
+      "searchSeed": 20260719,
+      "selectedCheckpointIteration": 16,
+      "checkpointsEvaluated": 9,
+      "trainScore": [
+        0,
+        1,
+        1,
+        61,
+        61,
+        36.916666666666664,
+        8.666666666666666,
+        100.08333333333333
+      ],
+      "validationScore": [
+        0,
+        3,
+        4,
+        49,
+        49,
+        30.5,
+        8,
+        90.66666666666667
+      ]
+    },
+    "fingerprint": "84cf4e3d0bff9183a19c46799c65207d94c44c882420d502c055746d42fb84d5"
+  },
+  "checkpoints": [
+    {
+      "iteration": 0,
+      "trainScore": [
+        2,
+        3,
+        7,
+        142,
+        142,
+        48.583333333333336,
+        8.75,
+        102.33333333333333
+      ],
+      "validationScore": [
+        4,
+        6,
+        10,
+        67,
+        67,
+        50.833333333333336,
+        10.666666666666666,
+        115
+      ],
+      "policyFingerprint": "2e7338f80397790ea501b12ab7996f6a5f3234c796e9879fc5f5a2929668fe3b"
+    },
+    {
+      "iteration": 2,
+      "trainScore": [
+        1,
+        4,
+        6,
+        82,
+        82,
+        40.833333333333336,
+        8.416666666666666,
+        98.5
+      ],
+      "validationScore": [
+        4,
+        6,
+        11,
+        72,
+        72,
+        52.833333333333336,
+        10.166666666666666,
+        109.83333333333333
+      ],
+      "policyFingerprint": "582163d19d74637b72d36bcd860fa195e15b5cd8c0359bd441ccdcad938bcad7"
+    },
+    {
+      "iteration": 7,
+      "trainScore": [
+        1,
+        4,
+        5,
+        68,
+        68,
+        39.5,
+        8.416666666666666,
+        98.41666666666667
+      ],
+      "validationScore": [
+        1,
+        6,
+        7,
+        65,
+        65,
+        53.833333333333336,
+        7.833333333333333,
+        90.83333333333333
+      ],
+      "policyFingerprint": "d26a62d663f7cde19486dc90506932e939584c0094d3c9d50d41d14fad8bf5dd"
+    },
+    {
+      "iteration": 10,
+      "trainScore": [
+        1,
+        4,
+        5,
+        68,
+        68,
+        37.416666666666664,
+        8.416666666666666,
+        98.33333333333333
+      ],
+      "validationScore": [
+        2,
+        6,
+        8,
+        65,
+        65,
+        56.666666666666664,
+        8.333333333333334,
+        96.5
+      ],
+      "policyFingerprint": "3557410b257ccac133e14fd66aacdd7abe443233f36d9e350c4eec36d6e89e5f"
+    },
+    {
+      "iteration": 13,
+      "trainScore": [
+        0,
+        3,
+        3,
+        61,
+        61,
+        37.75,
+        8.416666666666666,
+        96.75
+      ],
+      "validationScore": [
+        0,
+        3,
+        4,
+        49,
+        49,
+        31.5,
+        8.333333333333334,
+        94
+      ],
+      "policyFingerprint": "44efe2546ab98721ea3a6a01fcee14e2b3835f76a74019f313bac951fed529d5"
+    },
+    {
+      "iteration": 14,
+      "trainScore": [
+        0,
+        1,
+        1,
+        61,
+        61,
+        38.25,
+        8.833333333333334,
+        102.16666666666667
+      ],
+      "validationScore": [
+        0,
+        3,
+        4,
+        49,
+        49,
+        33.666666666666664,
+        8.166666666666666,
+        92.83333333333333
+      ],
+      "policyFingerprint": "54621d75ee4f903f003e6fe279527aca2eb441b7d7a9e1e4a19e9a50f18935e3"
+    },
+    {
+      "iteration": 16,
+      "trainScore": [
+        0,
+        1,
+        1,
+        61,
+        61,
+        36.916666666666664,
+        8.666666666666666,
+        100.08333333333333
+      ],
+      "validationScore": [
+        0,
+        3,
+        4,
+        49,
+        49,
+        30.5,
+        8,
+        90.66666666666667
+      ],
+      "policyFingerprint": "564802d34c92ae6082f75d04ab23ee2bf7e0ba4353ad3bde35c328a6cceb6ada"
+    },
+    {
+      "iteration": 17,
+      "trainScore": [
+        0,
+        1,
+        1,
+        61,
+        61,
+        33.583333333333336,
+        8.5,
+        98.58333333333333
+      ],
+      "validationScore": [
+        1,
+        3,
+        4,
+        49,
+        49,
+        28,
+        8.666666666666666,
+        97.33333333333333
+      ],
+      "policyFingerprint": "0da2eb78a6620eded5b1f979eea8ca8e2b7cf1c994113feaeddeb5f59c7d025c"
+    },
+    {
+      "iteration": 18,
+      "trainScore": [
+        0,
+        1,
+        1,
+        61,
+        61,
+        33.583333333333336,
+        8.416666666666666,
+        97.75
+      ],
+      "validationScore": [
+        1,
+        3,
+        4,
+        49,
+        49,
+        28,
+        8.666666666666666,
+        97.33333333333333
+      ],
+      "policyFingerprint": "3a9270c972acd65bee84e90c34346d03bb843aa13b22968232f52f6f9f80c711"
+    }
+  ]
+}

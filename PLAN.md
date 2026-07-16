@@ -152,7 +152,14 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
     final non-combat use removes a broken item. Chapter 3 representative routes
     now match the live engine at every action boundary. The affected artifacts
     were invalidated once more; final manifests will be committed before the
-    clean rerun. Solver tests are 30/30.
+    clean rerun. The sealed held-out selected-policy scores are Chapter 3
+    `[1,2,3,61,61,45,9.833,109.5]` (5/6 clears), Chapter 4
+    `[3,5,5,82,82,45.667,4,62.5]` (3/6 clears), and Chapter 5
+    `[0,5,6,95,95,71.667,4,65.667]` (6/6 clears). The separate 3,000-node
+    per-seed beam farm solved 4/6, 5/6, and 3/6 test seeds. All aggregate and
+    per-seed JSON, HTML reports, and representative replays are checked in.
+    Solver tests are 30/30; canonical verification, solver typecheck,
+    production build, and the 3/3 live parity matrix pass.
 
 - **Chapter 5 live differential matrix + exact checkpoint restoration:**
   - Generalized the saved-route Playwright differential into a Chapter 4/5
@@ -635,14 +642,14 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 - [x] Versioned deterministic Chapter 3/4/5 train, validation, and test manifests
 - [x] Parallel policy evaluator, validation-selected training, held-out verifier,
   per-seed beam/proof farm, aggregate JSON/HTML, and representative replays
-- [ ] Run and publish Chapter 3 baseline train/validation evaluations
-- [ ] Train Chapter 3 using train seeds only; select on validation; run the
+- [x] Run and publish Chapter 3 baseline train/validation evaluations
+- [x] Train Chapter 3 using train seeds only; select on validation; run the
   held-out test once for both baseline and selected policy
-- [ ] Publish Chapter 3 solve-coverage farm and live-browser parity for the
+- [x] Publish Chapter 3 solve-coverage farm and live-browser parity for the
   typical, worst successful, and failed representative seeds where present
-- [ ] Run the identical frozen pipeline for Chapters 4 and 5 without
+- [x] Run the identical frozen pipeline for Chapters 4 and 5 without
   chapter-specific simulator logic
-- [ ] Final full solver tests, solver typecheck, production build, and live
+- [x] Final full solver tests, solver typecheck, production build, and live
   parity audit; then record benchmark metrics here and in `AGENTS.md`
 
 ### Multi-Project Compatibility (Active)

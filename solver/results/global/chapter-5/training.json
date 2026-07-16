@@ -1,0 +1,300 @@
+{
+  "version": 1,
+  "kind": "global-policy-training",
+  "scenario": "Sacred Stones Ch. 5: The Empire's Reach (Joshua recruitment)",
+  "levelNid": "5",
+  "scenarioFingerprint": {
+    "version": 1,
+    "scenarioSha256": "99668388bf92cbf837f6e2df8ae963fa6ee9d42d6a4f5c84458c51cc73d92eda",
+    "projectDataSha256": "a22fb5b668c7c9219bc346ea8d79b34f37f100ab09ba13245fcb0860e0aaf8fc",
+    "engineSourceSha256": "6f22937f7e50dee2990bc39b4962469083191457f9a47cbfb26048a29688e6fe",
+    "instanceSha256": "6f1584ef61b09bf9a95ffab921febef23b8df3d36b5d1081f2d3a8a9ab20240f"
+  },
+  "trainManifestFingerprint": "25cde6e90298ede0741a4579ef6680f374438c1beab74aa6ebd954a0ae6d0f66",
+  "validationManifestFingerprint": "f05fbc1f52cb112e5bb35f047bbcdabd301065c419238c3ba8a6a188c106e85d",
+  "iterations": 100,
+  "searchSeed": 20260721,
+  "selectedPolicy": {
+    "version": 1,
+    "kind": "deterministic-heuristic",
+    "deterministic": true,
+    "scenarioFingerprint": {
+      "version": 1,
+      "scenarioSha256": "99668388bf92cbf837f6e2df8ae963fa6ee9d42d6a4f5c84458c51cc73d92eda",
+      "projectDataSha256": "a22fb5b668c7c9219bc346ea8d79b34f37f100ab09ba13245fcb0860e0aaf8fc",
+      "engineSourceSha256": "6f22937f7e50dee2990bc39b4962469083191457f9a47cbfb26048a29688e6fe",
+      "instanceSha256": "6f1584ef61b09bf9a95ffab921febef23b8df3d36b5d1081f2d3a8a9ab20240f"
+    },
+    "weights": {
+      "kill": 93.23491758459866,
+      "bossKill": 359.8729063947479,
+      "damage": 3.5953247940326767,
+      "counterDamage": 3.9288276656695342,
+      "lethalRisk": 2937.4529112163796,
+      "progress": 15.437672405984735,
+      "danger": 3.7493168962481045,
+      "wall": 93.43040918641576,
+      "heal": 2.945833880122462,
+      "stayHealthy": 3.283912899318966,
+      "unitBias": {
+        "Seth": 11.212507020682096,
+        "Eirika": -0.24568479508161545,
+        "Franz": -15.172063071280718,
+        "Gilliam": 12.12405121512711,
+        "Garcia": 5.876928526908159,
+        "Vanessa": -2.730988560244441,
+        "Ross": 10.587668279185891,
+        "Neimi": 6.234090179204941,
+        "Moulder": -19.681827392429113
+      },
+      "unitRisk": {}
+    },
+    "selection": {
+      "trainManifestFingerprint": "25cde6e90298ede0741a4579ef6680f374438c1beab74aa6ebd954a0ae6d0f66",
+      "validationManifestFingerprint": "f05fbc1f52cb112e5bb35f047bbcdabd301065c419238c3ba8a6a188c106e85d",
+      "iterations": 100,
+      "searchSeed": 20260721,
+      "selectedCheckpointIteration": 95,
+      "checkpointsEvaluated": 9,
+      "trainScore": [
+        2,
+        4,
+        5,
+        79,
+        79,
+        61.833333333333336,
+        6,
+        83.75
+      ],
+      "validationScore": [
+        0,
+        5,
+        6,
+        98,
+        98,
+        71.33333333333333,
+        4,
+        65
+      ]
+    },
+    "fingerprint": "0d70631c4c3caa979a4b29628c99dfcfa68e3cf76cd48cb2e9081d4675e72e16"
+  },
+  "checkpoints": [
+    {
+      "iteration": 0,
+      "trainScore": [
+        6,
+        6,
+        7,
+        80,
+        80,
+        52.25,
+        10,
+        122.66666666666667
+      ],
+      "validationScore": [
+        1,
+        5,
+        8,
+        89,
+        89,
+        72.66666666666667,
+        6,
+        82.5
+      ],
+      "policyFingerprint": "bbcc043c143bd1fdcefa4c0706a12c220fa67443ff8a32c44b286ea4eefbb62e"
+    },
+    {
+      "iteration": 6,
+      "trainScore": [
+        6,
+        6,
+        7,
+        75,
+        75,
+        51.25,
+        10,
+        122.41666666666667
+      ],
+      "validationScore": [
+        1,
+        6,
+        9,
+        89,
+        89,
+        71,
+        6,
+        82.33333333333333
+      ],
+      "policyFingerprint": "afa0e51b03cfaf20629a33c3c2a537ea0cd0e2433c13a0829f6b4a58f09d8483"
+    },
+    {
+      "iteration": 9,
+      "trainScore": [
+        6,
+        6,
+        7,
+        75,
+        75,
+        51.166666666666664,
+        10,
+        122.41666666666667
+      ],
+      "validationScore": [
+        1,
+        6,
+        9,
+        89,
+        89,
+        71,
+        6,
+        82.33333333333333
+      ],
+      "policyFingerprint": "9697d6b3870ca35c88481a1a5aff702064e462f554bbb36590be7c6a00724a7e"
+    },
+    {
+      "iteration": 14,
+      "trainScore": [
+        6,
+        6,
+        6,
+        75,
+        75,
+        53.166666666666664,
+        10,
+        122.66666666666667
+      ],
+      "validationScore": [
+        1,
+        4,
+        6,
+        96,
+        96,
+        68.83333333333333,
+        6,
+        84.66666666666667
+      ],
+      "policyFingerprint": "fb2dfe7c6d26095932b9340da7034a39b483f0c4823977e6d912bbbd8fa8f429"
+    },
+    {
+      "iteration": 41,
+      "trainScore": [
+        6,
+        2,
+        2,
+        84,
+        84,
+        55.666666666666664,
+        10,
+        123.41666666666667
+      ],
+      "validationScore": [
+        1,
+        6,
+        7,
+        93,
+        93,
+        72.66666666666667,
+        6,
+        82.66666666666667
+      ],
+      "policyFingerprint": "af2a023208f730289ed1496b3c95b90cfb427fa2197d21d826c9103dad1a4148"
+    },
+    {
+      "iteration": 77,
+      "trainScore": [
+        6,
+        2,
+        2,
+        79,
+        79,
+        56.5,
+        10,
+        123.25
+      ],
+      "validationScore": [
+        1,
+        6,
+        7,
+        98,
+        98,
+        73.16666666666667,
+        6,
+        82.66666666666667
+      ],
+      "policyFingerprint": "fafb56ad92e71c2878eef76d64f5ce3939619949724a0a57cd9d3d490191de15"
+    },
+    {
+      "iteration": 82,
+      "trainScore": [
+        2,
+        4,
+        5,
+        79,
+        79,
+        64.33333333333333,
+        6,
+        84.5
+      ],
+      "validationScore": [
+        0,
+        5,
+        6,
+        98,
+        98,
+        72.33333333333333,
+        4,
+        65
+      ],
+      "policyFingerprint": "beddfccde998a794c8d17c82a1fc2fc9c456b5c9f287ca62f8bb2a3ffcee5f79"
+    },
+    {
+      "iteration": 85,
+      "trainScore": [
+        2,
+        4,
+        5,
+        79,
+        79,
+        62.5,
+        6,
+        83.75
+      ],
+      "validationScore": [
+        0,
+        5,
+        6,
+        98,
+        98,
+        72,
+        4,
+        65
+      ],
+      "policyFingerprint": "ae428fbe19d9442c2ef7f999f147466d457e2217966edc5e804f17fd8eef5ef3"
+    },
+    {
+      "iteration": 95,
+      "trainScore": [
+        2,
+        4,
+        5,
+        79,
+        79,
+        61.833333333333336,
+        6,
+        83.75
+      ],
+      "validationScore": [
+        0,
+        5,
+        6,
+        98,
+        98,
+        71.33333333333333,
+        4,
+        65
+      ],
+      "policyFingerprint": "b52ffc6be60565ea05ed1b965ec7b7950e10383eaa297b935da6cb1e01d0edac"
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "kind": "deterministic-heuristic",
+  "deterministic": true,
+  "scenarioFingerprint": {
+    "version": 1,
+    "scenarioSha256": "199360ff512164382f85bad6f001e632d6070115e7c7738ff4b0b02885129a0b",
+    "projectDataSha256": "a22fb5b668c7c9219bc346ea8d79b34f37f100ab09ba13245fcb0860e0aaf8fc",
+    "engineSourceSha256": "6f22937f7e50dee2990bc39b4962469083191457f9a47cbfb26048a29688e6fe",
+    "instanceSha256": "e54fb5da7e432a98781f8c4e07d47f14db716d5d802ae4dfd758723cd015f31b"
+  },
+  "weights": {
+    "kill": 105.0745150576195,
+    "bossKill": 180,
+    "damage": 3.5,
+    "counterDamage": 5,
+    "lethalRisk": 1768.5105232952058,
+    "progress": 8.900373409292072,
+    "danger": 4.211554306820501,
+    "wall": 120,
+    "heal": 6.315500025935328,
+    "stayHealthy": 2,
+    "unitBias": {
+      "Seth": 18,
+      "Eirika": 8,
+      "Franz": 6,
+      "Gilliam": 1.0308473035693169,
+      "Garcia": 3.6343869119882584,
+      "Vanessa": 2,
+      "Ross": -2,
+      "Neimi": -1,
+      "Moulder": -9.631151102483273
+    },
+    "unitRisk": {}
+  },
+  "selection": {
+    "trainManifestFingerprint": "3fe803b5f0f72c148a67645205ccf92255ce6838db5121bc486502a66cf47853",
+    "validationManifestFingerprint": "88dadcb11246d3d3e464de343abae64c3623fc70082baf997e949fb2ca81cb2f",
+    "iterations": 100,
+    "searchSeed": 20260720,
+    "selectedCheckpointIteration": 8,
+    "checkpointsEvaluated": 11,
+    "trainScore": [
+      8,
+      10,
+      12,
+      59,
+      59,
+      41.583333333333336,
+      3.5,
+      53.75
+    ],
+    "validationScore": [
+      3,
+      4,
+      4,
+      55,
+      55,
+      38.5,
+      4.166666666666667,
+      61.833333333333336
+    ]
+  },
+  "fingerprint": "e2123dd25066a88fc4505d1284b54d8f33e260d0530ef27c5524abffe95a2390"
+}

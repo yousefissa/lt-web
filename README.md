@@ -111,4 +111,20 @@ seed. Its frozen observation contains only current tactical state and complete
 legal actions; global reports retain every clear, failure, and error and score
 failed clears, deaths, worst/CVaR-95/mean damage, turns, then actions.
 
+The sealed held-out benchmark produced these exact global scores (lower is
+better; tuple order is failed clears, death-bearing seeds, total deaths, worst
+damage, CVaR-95 damage, mean damage, mean turns, mean actions):
+
+| Chapter | Baseline test score | Selected-policy test score | Beam coverage |
+|---|---|---|---|
+| 3 | `[1,3,3,62,62,37.5,8.5,99.333]` | `[1,2,3,61,61,45,9.833,109.5]` | 4/6 |
+| 4 | `[3,5,6,69,69,43,4.5,65.167]` | `[3,5,5,82,82,45.667,4,62.5]` | 5/6 |
+| 5 | `[3,2,3,85,85,69.833,10,125.667]` | `[0,5,6,95,95,71.667,4,65.667]` | 3/6 |
+
+The selected policies therefore clear 5/6, 3/6, and 6/6 held-out seeds for
+Chapters 3–5. Beam coverage is a separate 3,000-node-per-seed best-found
+diagnostic, not a global-policy result or infeasibility proof. Full aggregate
+and per-seed JSON, HTML reports, and representative replays are under
+`solver/results/global/`; frozen policies are under `solver/policies/`.
+
 See [TESTING.md](./TESTING.md) for solver and browser regression commands.

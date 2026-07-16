@@ -466,6 +466,13 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
   beam or proof search for every immutable manifest entry and reports solve
   coverage, per-seed witnesses, failures, unknown proofs, and errors without
   selecting or discarding seeds.
+- **Held-out global results**: On the sealed six-seed test manifests, the
+  selected Chapter 3 policy scores `[1,2,3,61,61,45,9.833,109.5]` and clears
+  5/6 seeds; Chapter 4 scores `[3,5,5,82,82,45.667,4,62.5]` and clears 3/6;
+  Chapter 5 scores `[0,5,6,95,95,71.667,4,65.667]` and clears 6/6. Tuple order
+  is failures, death-bearing seeds, deaths, worst/CVaR-95/mean damage, turns,
+  and actions. The separate 3,000-node best-found beam farm covers 4/6, 5/6,
+  and 3/6 seeds respectively; unresolved seeds are retained and are not proofs.
 - **Planner state**: Versioned checkpoints and independent clones preserve RNG,
   turn/event lifecycle, metrics, unit flags/stats/positions, inventories/uses,
   explicit equipment, exact skills and mutable skill data, active

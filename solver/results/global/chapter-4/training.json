@@ -1,0 +1,348 @@
+{
+  "version": 1,
+  "kind": "global-policy-training",
+  "scenario": "Sacred Stones Ch. 4: Ancient Horrors",
+  "levelNid": "4",
+  "scenarioFingerprint": {
+    "version": 1,
+    "scenarioSha256": "199360ff512164382f85bad6f001e632d6070115e7c7738ff4b0b02885129a0b",
+    "projectDataSha256": "a22fb5b668c7c9219bc346ea8d79b34f37f100ab09ba13245fcb0860e0aaf8fc",
+    "engineSourceSha256": "6f22937f7e50dee2990bc39b4962469083191457f9a47cbfb26048a29688e6fe",
+    "instanceSha256": "e54fb5da7e432a98781f8c4e07d47f14db716d5d802ae4dfd758723cd015f31b"
+  },
+  "trainManifestFingerprint": "3fe803b5f0f72c148a67645205ccf92255ce6838db5121bc486502a66cf47853",
+  "validationManifestFingerprint": "88dadcb11246d3d3e464de343abae64c3623fc70082baf997e949fb2ca81cb2f",
+  "iterations": 100,
+  "searchSeed": 20260720,
+  "selectedPolicy": {
+    "version": 1,
+    "kind": "deterministic-heuristic",
+    "deterministic": true,
+    "scenarioFingerprint": {
+      "version": 1,
+      "scenarioSha256": "199360ff512164382f85bad6f001e632d6070115e7c7738ff4b0b02885129a0b",
+      "projectDataSha256": "a22fb5b668c7c9219bc346ea8d79b34f37f100ab09ba13245fcb0860e0aaf8fc",
+      "engineSourceSha256": "6f22937f7e50dee2990bc39b4962469083191457f9a47cbfb26048a29688e6fe",
+      "instanceSha256": "e54fb5da7e432a98781f8c4e07d47f14db716d5d802ae4dfd758723cd015f31b"
+    },
+    "weights": {
+      "kill": 105.0745150576195,
+      "bossKill": 180,
+      "damage": 3.5,
+      "counterDamage": 5,
+      "lethalRisk": 1768.5105232952058,
+      "progress": 8.900373409292072,
+      "danger": 4.211554306820501,
+      "wall": 120,
+      "heal": 6.315500025935328,
+      "stayHealthy": 2,
+      "unitBias": {
+        "Seth": 18,
+        "Eirika": 8,
+        "Franz": 6,
+        "Gilliam": 1.0308473035693169,
+        "Garcia": 3.6343869119882584,
+        "Vanessa": 2,
+        "Ross": -2,
+        "Neimi": -1,
+        "Moulder": -9.631151102483273
+      },
+      "unitRisk": {}
+    },
+    "selection": {
+      "trainManifestFingerprint": "3fe803b5f0f72c148a67645205ccf92255ce6838db5121bc486502a66cf47853",
+      "validationManifestFingerprint": "88dadcb11246d3d3e464de343abae64c3623fc70082baf997e949fb2ca81cb2f",
+      "iterations": 100,
+      "searchSeed": 20260720,
+      "selectedCheckpointIteration": 8,
+      "checkpointsEvaluated": 11,
+      "trainScore": [
+        8,
+        10,
+        12,
+        59,
+        59,
+        41.583333333333336,
+        3.5,
+        53.75
+      ],
+      "validationScore": [
+        3,
+        4,
+        4,
+        55,
+        55,
+        38.5,
+        4.166666666666667,
+        61.833333333333336
+      ]
+    },
+    "fingerprint": "e2123dd25066a88fc4505d1284b54d8f33e260d0530ef27c5524abffe95a2390"
+  },
+  "checkpoints": [
+    {
+      "iteration": 0,
+      "trainScore": [
+        8,
+        11,
+        13,
+        76,
+        76,
+        41.916666666666664,
+        3.3333333333333335,
+        53.916666666666664
+      ],
+      "validationScore": [
+        3,
+        4,
+        4,
+        58,
+        58,
+        36.166666666666664,
+        4,
+        60.5
+      ],
+      "policyFingerprint": "701097287059da93c6e5f2e3d3d3199fb8c6fdb542533c6674e62e6622e402ff"
+    },
+    {
+      "iteration": 5,
+      "trainScore": [
+        8,
+        11,
+        13,
+        59,
+        59,
+        41.916666666666664,
+        3.5833333333333335,
+        55
+      ],
+      "validationScore": [
+        3,
+        5,
+        5,
+        50,
+        50,
+        37.5,
+        4.166666666666667,
+        63.166666666666664
+      ],
+      "policyFingerprint": "09893fa47fe0cefc627591498b50bf98e1664acfc0ba527114a1b4c8f4773536"
+    },
+    {
+      "iteration": 7,
+      "trainScore": [
+        8,
+        10,
+        12,
+        59,
+        59,
+        41.583333333333336,
+        3.5,
+        53.916666666666664
+      ],
+      "validationScore": [
+        3,
+        4,
+        4,
+        55,
+        55,
+        38.5,
+        4.166666666666667,
+        62
+      ],
+      "policyFingerprint": "a8eac9cc9c09ec115d13e6c153999e83f43b8d4f7288d3bd6d204e451059764a"
+    },
+    {
+      "iteration": 8,
+      "trainScore": [
+        8,
+        10,
+        12,
+        59,
+        59,
+        41.583333333333336,
+        3.5,
+        53.75
+      ],
+      "validationScore": [
+        3,
+        4,
+        4,
+        55,
+        55,
+        38.5,
+        4.166666666666667,
+        61.833333333333336
+      ],
+      "policyFingerprint": "a10d7a7385641149b47520a201b77cd02558a2f6b2de3eec2effbc3c3034e5b6"
+    },
+    {
+      "iteration": 15,
+      "trainScore": [
+        7,
+        10,
+        11,
+        89,
+        89,
+        47.833333333333336,
+        4.166666666666667,
+        60.166666666666664
+      ],
+      "validationScore": [
+        5,
+        5,
+        5,
+        67,
+        67,
+        39.5,
+        3,
+        46.666666666666664
+      ],
+      "policyFingerprint": "eb7cdd38a25cc0e9e080e161f3492c8ec687a2f7025e39e8a52a032a6d477303"
+    },
+    {
+      "iteration": 18,
+      "trainScore": [
+        7,
+        9,
+        10,
+        54,
+        54,
+        37.833333333333336,
+        3.6666666666666665,
+        57.333333333333336
+      ],
+      "validationScore": [
+        5,
+        6,
+        6,
+        51,
+        51,
+        36.833333333333336,
+        2.6666666666666665,
+        44.333333333333336
+      ],
+      "policyFingerprint": "dccc7fbf3f2d45117b6734ca01642c7853ba0d3b72a2ed48f09b13bfa9778c23"
+    },
+    {
+      "iteration": 24,
+      "trainScore": [
+        7,
+        9,
+        9,
+        53,
+        53,
+        37.75,
+        3.6666666666666665,
+        57.416666666666664
+      ],
+      "validationScore": [
+        5,
+        6,
+        6,
+        51,
+        51,
+        36.833333333333336,
+        2.6666666666666665,
+        44.333333333333336
+      ],
+      "policyFingerprint": "53eef4fa1d3f7a836cd4730cf3a2935d7fb56fd341c3e0d7487e59cafad3422e"
+    },
+    {
+      "iteration": 26,
+      "trainScore": [
+        7,
+        8,
+        8,
+        69,
+        69,
+        40.5,
+        3.9166666666666665,
+        59.5
+      ],
+      "validationScore": [
+        5,
+        5,
+        5,
+        48,
+        48,
+        36.333333333333336,
+        3,
+        47
+      ],
+      "policyFingerprint": "b217fe654d337c711843215c7e7cdf0c2356064fdb32be40604c1e9d8ebbf708"
+    },
+    {
+      "iteration": 52,
+      "trainScore": [
+        7,
+        8,
+        8,
+        69,
+        69,
+        39.166666666666664,
+        3.9166666666666665,
+        59.5
+      ],
+      "validationScore": [
+        5,
+        5,
+        5,
+        48,
+        48,
+        36.333333333333336,
+        3,
+        47
+      ],
+      "policyFingerprint": "43fbca98626622df3435d090e5f1afc05b54b1e3b764743f2ce7275787663764"
+    },
+    {
+      "iteration": 87,
+      "trainScore": [
+        6,
+        8,
+        8,
+        69,
+        69,
+        40.583333333333336,
+        4.166666666666667,
+        62.25
+      ],
+      "validationScore": [
+        5,
+        5,
+        5,
+        48,
+        48,
+        36.333333333333336,
+        3,
+        47
+      ],
+      "policyFingerprint": "697d181fb4f99e9629054f91d42feac03e3a468738c47c7d8c1189412984a4c3"
+    },
+    {
+      "iteration": 89,
+      "trainScore": [
+        4,
+        7,
+        7,
+        59,
+        59,
+        43.25,
+        5.333333333333333,
+        76.41666666666667
+      ],
+      "validationScore": [
+        4,
+        4,
+        4,
+        59,
+        59,
+        41.333333333333336,
+        3,
+        49
+      ],
+      "policyFingerprint": "a3b69cd00a9943895032b41d3157058a56022954fb8214d2207e8573a5358515"
+    }
+  ]
+}
