@@ -4,6 +4,7 @@ import type { Database } from '../data/database';
 import type { GameBoard } from '../objects/game-board';
 import type { CombatStrike } from './combat-solver';
 import { CombatPhaseSolver, type RngMode } from './combat-solver';
+import { consumeCombatItemUses } from './combat-uses';
 
 // ============================================================
 // MapCombat - Manages the visual presentation of combat on the
@@ -251,21 +252,12 @@ export class MapCombat {
     let attackWeaponBroke = false;
     let defenseWeaponBroke = false;
 
-    if (attackerStrikeCount > 0 && this.attackItem.maxUses > 0) {
-      // Decrement once per combat (not per strike) to match LT behavior
-      attackWeaponBroke = this.attackItem.decrementUses();
-      if (attackWeaponBroke) {
-        const idx = this.attacker.items.indexOf(this.attackItem);
-        if (idx !== -1) this.attacker.items.splice(idx, 1);
-      }
+    if (attackerStrikeCount > 0) {
+      attackWeaponBroke = consumeCombatItemUses(this.attacker, this.attackItem, this.strikes);
     }
 
-    if (defenderStrikeCount > 0 && this.defenseItem && this.defenseItem.maxUses > 0) {
-      defenseWeaponBroke = this.defenseItem.decrementUses();
-      if (defenseWeaponBroke) {
-        const idx = this.defender.items.indexOf(this.defenseItem);
-        if (idx !== -1) this.defender.items.splice(idx, 1);
-      }
+    if (defenderStrikeCount > 0 && this.defenseItem) {
+      defenseWeaponBroke = consumeCombatItemUses(this.defender, this.defenseItem, this.strikes);
     }
 
     // Calculate EXP

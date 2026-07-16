@@ -426,5 +426,12 @@
       "Joshua"
     ],
     "requirementsSatisfied": true
+  },
+  "benchmark": {
+    "version": 1,
+    "scenarioSha256": "e75410c8a421e222175322c0680333760b9a8baff806022a89ec97563da2034f",
+    "projectDataSha256": "a22fb5b668c7c9219bc346ea8d79b34f37f100ab09ba13245fcb0860e0aaf8fc",
+    "engineSourceSha256": "3d44921bd606ab01a25723f06fd227cfdd020de401273fffe2f83db0876e2780",
+    "instanceSha256": "90d4a8f36a825046f926cefecd903a5ef3b3a9b115e4fb6ffe411f336a005dda"
   }
 }

@@ -8,8 +8,8 @@ Lex Talionis Python/Pygame engine.
 
 ## Current State
 
-**88 engine source files, ~46,500 lines of TypeScript, plus 13 solver files
-(~4,000 lines).**
+**90 engine source files, ~46,700 lines of TypeScript, plus 13 solver runtime
+files (~4,300 lines) and 7 solver test files.**
 Builds cleanly with zero type errors. All four development phases (Foundation,
 Playable, Visual Polish, Mobile/Distribution) are complete. The engine loads
 `.ltproj` game data over HTTP and runs at 60 fps on Canvas 2D with dynamic
@@ -110,6 +110,31 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
   resolves, matching Python's synchronous behavior and preventing async race frames.
 
 ### Recent Changes
+
+- **Dominance/proof search + engine parity audit:**
+  - Split exact future-state identity from irreversible path cost. The
+    transposition table now keeps Pareto-minimal death/damage/action labels and
+    discards duplicate or dominated routes without weakening RNG identity.
+  - Reworked beam nodes to store replay-free checkpoints and reuse one simulator
+    workspace instead of constructing a full chapter for every branch. A
+    10,000-node Chapter 4 benchmark completed in 5.3s (~1,886 nodes/s), about
+    34% faster than the prior 80,000-node run's average throughput (~1,411/s).
+  - Added irreversible incumbent, `--max-deaths`, and `--max-damage` pruning.
+    Added `prove`, a complete legal-action DFS for the supported headless model:
+    it reports `found`, `infeasible` only when the bounded tree is exhausted, or
+    `unknown` when `--max-nodes` interrupts the proof.
+  - Added versioned benchmark fingerprints over gameplay scenario fields,
+    project text/game data, engine source, and solver transition files. Verify,
+    continuation, and prefixes now reject stale or mismatched artifacts even if
+    their numeric seed happens to match.
+  - Added a shared renderer-independent parity snapshot and field-level diff for
+    solver/live-harness action boundaries: turn, phase, RNG, unit stats/flags,
+    positions, inventories, active regions, and visible layers. The browser
+    harness regression passes under real Chrome.
+  - Parity review found and fixed weapon durability semantics in map combat,
+    animation combat, and the headless solver. They now match Python LT: uses
+    are lost per successful strike by default, misses only when configured, and
+    `one_loss_per_combat` collapses eligible strikes to one use.
 
 - **Chapter 5 fixed-seed solver + reusable map interactions:**
   - Generalized standard events into legal `visit`, directional `talk`, `chest`,
@@ -263,6 +288,17 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
     `58-ch5-village-ordering-visit-vs-destroy.png`,
     `59-ch5-turn-event-idempotency.png`.
   - Focused Playwright pass for these five new regressions: **5/5**. Build also passes (`npm run build`).
+
+### Solver Next Milestones
+
+- [ ] Drive a complete saved planner route through the live browser state
+  machine and compare the parity snapshot after every action/phase boundary.
+- [ ] Replace checkpoint restoration with compact apply/undo or copy-on-write
+  state and incremental hashing; keep the checkpoint path as an oracle.
+- [ ] Add deterministic fixed-seed worker sharding across opening actions with
+  reproducible incumbent merges.
+- [ ] Add campaign-state carryover for EXP, levels, WEXP, inventory uses,
+  recruits, deaths, convoy, and money before importing Chapter 6.
 
 ### Ralph Loop Backlog (Autonomous)
 

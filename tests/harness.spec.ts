@@ -82,6 +82,21 @@ test.describe('DEBUG Level (clean)', () => {
     await saveScreenshot(page, '01-debug-map');
   });
 
+  test('parity snapshot exposes deterministic action-boundary state', async ({ page }) => {
+    await page.goto('/?harness=true&level=DEBUG&bundle=false');
+    await waitForHarness(page);
+    await page.evaluate(() => (window as any).__harness.setSeed(37));
+    const parity = await page.evaluate(() => (window as any).__harness.getParityState());
+
+    expect(parity.turn).toBe(1);
+    expect(parity.phase).toBe('player');
+    expect(parity.rngState).toBe(37);
+    expect(parity.units.length).toBeGreaterThan(0);
+    expect(parity.units).toEqual([...parity.units].sort((a: any, b: any) => a.nid.localeCompare(b.nid)));
+    expect(Array.isArray(parity.activeRegions)).toBe(true);
+    expect(parity.visibleLayers.length).toBeGreaterThan(0);
+  });
+
   test('cursor movement', async ({ page }) => {
     await page.goto('/?harness=true&level=DEBUG&bundle=false');
     await waitForHarness(page);

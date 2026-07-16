@@ -606,5 +606,12 @@
     "deepestTurn": 7,
     "incumbentSource": "beam",
     "elapsedMs": 56700.14825
+  },
+  "benchmark": {
+    "version": 1,
+    "scenarioSha256": "4fa573e0df261551beb463a5ee8c781d839754790f21dcd8c8d24327ddd7adec",
+    "projectDataSha256": "a22fb5b668c7c9219bc346ea8d79b34f37f100ab09ba13245fcb0860e0aaf8fc",
+    "engineSourceSha256": "3d44921bd606ab01a25723f06fd227cfdd020de401273fffe2f83db0876e2780",
+    "instanceSha256": "79ea89da948c59b98c7f8c701290a113ed881855dbdd0c50fa6d583024453c01"
   }
 }

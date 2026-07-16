@@ -2,8 +2,14 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { beamSearchFixedSeed, replayPlannedSolution, runGreedyPlannedSolution } from './beam-search';
+import {
+  beamSearchFixedSeed,
+  createSimulatorFromPlan,
+  replayPlannedSolution,
+  runGreedyPlannedSolution,
+} from './beam-search';
 import { loadSolverProject } from './project-loader';
+import { proveFixedSeedBound } from './proof-search';
 import { searchSeedRangeParallel } from './parallel-search';
 import { searchSeedRange } from './search';
 import { TacticalSimulator } from './simulator';
@@ -110,6 +116,7 @@ test('planner checkpoints clone exact RNG, unit, inventory, and turn state', {
 
   const clone = simulator.clone(false);
   assert.equal(clone.getTranspositionKey(), simulator.getTranspositionKey());
+  assert.equal(clone.getFutureStateKey(), simulator.getFutureStateKey());
   const chosen = actions.find((action) => action.type === 'attack') ?? actions[0];
   simulator.applyPlayerAction(chosen);
   clone.applyPlayerAction(chosen);
@@ -117,6 +124,30 @@ test('planner checkpoints clone exact RNG, unit, inventory, and turn state', {
   assert.equal(clone.getTranspositionKey(), simulator.getTranspositionKey());
   assert.deepEqual(clone.getResult().metrics, simulator.getResult().metrics);
   assert.deepEqual(clone.getResult().finalUnits, simulator.getResult().finalUnits);
+});
+
+test('future-state identity excludes already-paid path cost', {
+  skip: !existsSync(projectPath),
+}, async () => {
+  const scenario = JSON.parse(await readFile(scenarioPath, 'utf8')) as SolverScenario;
+  const { db } = await loadSolverProject(projectPath);
+  const simulator = new TacticalSimulator(db, scenario);
+  simulator.beginPlayerTurn();
+  const checkpoint = simulator.createCheckpoint(false);
+  const futureKey = simulator.getFutureStateKey();
+  const exactKey = simulator.getTranspositionKey();
+
+  checkpoint.metrics.actions += 3;
+  checkpoint.metrics.damageTaken += 4;
+  simulator.restoreCheckpoint(checkpoint);
+
+  assert.equal(simulator.getFutureStateKey(), futureKey);
+  assert.notEqual(simulator.getTranspositionKey(), exactKey);
+  assert.deepEqual(simulator.getSearchCost(), {
+    playerDeaths: checkpoint.metrics.playerDeaths,
+    damageTaken: checkpoint.metrics.damageTaken,
+    actions: checkpoint.metrics.actions,
+  });
 });
 
 test('explicit fixed-seed greedy plan matches and replays the legacy Chapter 4 incumbent', {
@@ -159,6 +190,38 @@ test('beam search remains on the scenario seed and returns a replayable incumben
   const replayed = replayPlannedSolution(db, scenario, searched.result.policy, searched.result.plan!);
   assert.deepEqual(replayed.score, searched.result.score);
   assert.deepEqual(replayed.metrics, searched.result.metrics);
+});
+
+test('proof search distinguishes a found route from an exhausted damage bound', {
+  skip: !existsSync(projectPath),
+}, async () => {
+  const scenario = JSON.parse(await readFile('solver/scenarios/chapter-4.json', 'utf8')) as SolverScenario;
+  const saved = JSON.parse(await readFile('solver/solutions/chapter-4.json', 'utf8')) as {
+    policy: PolicyWeights;
+    plan: PlannerAction[];
+    metrics: SolverMetrics;
+  };
+  const { db } = await loadSolverProject(projectPath);
+  const prefix = saved.plan.slice(0, -1);
+  const prefixSimulator = createSimulatorFromPlan(db, scenario, saved.policy, prefix);
+  assert.equal(prefixSimulator.getSearchCost().damageTaken, saved.metrics.damageTaken);
+
+  const found = proveFixedSeedBound(db, scenario, saved.policy, {
+    maxNodes: 500,
+    maxPlayerDeaths: 0,
+    maxDamage: saved.metrics.damageTaken,
+  }, prefix);
+  assert.equal(found.status, 'found');
+  assert.equal(found.result?.metrics.cleared, true);
+  assert.equal(found.result?.seed, scenario.seed);
+
+  const infeasible = proveFixedSeedBound(db, scenario, saved.policy, {
+    maxNodes: 500,
+    maxPlayerDeaths: 0,
+    maxDamage: saved.metrics.damageTaken - 1,
+  }, prefix);
+  assert.equal(infeasible.status, 'infeasible');
+  assert.equal(infeasible.stats.exhausted, true);
 });
 
 test('saved Chapter 5 fixed-seed plan recruits Joshua and clears without deaths', {

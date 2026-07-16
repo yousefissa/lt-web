@@ -123,6 +123,14 @@ export interface SolverMetrics {
   remainingEnemyHp: number;
 }
 
+export interface BenchmarkFingerprint {
+  version: 1;
+  scenarioSha256: string;
+  projectDataSha256: string;
+  engineSourceSha256: string;
+  instanceSha256: string;
+}
+
 export interface SolverResult {
   scenario: string;
   levelNid: string;
@@ -140,7 +148,10 @@ export interface SolverResult {
   /** Explicit action route for planner-produced solutions. */
   plan?: PlannerAction[];
   planner?: BeamSearchStats;
+  proof?: ProofSearchStats;
   interactions: SolverInteractionState;
+  /** Immutable benchmark identity written by the CLI around simulator output. */
+  benchmark?: BenchmarkFingerprint;
 }
 
 export type PlannerActionType = 'attack' | 'heal' | 'move' | 'wait' | 'seize'
@@ -240,6 +251,13 @@ export interface SolverInteractionState {
   requirementsSatisfied: boolean;
 }
 
+/** Irreversible path cost kept outside tactical transposition identity. */
+export interface SearchCost {
+  playerDeaths: number;
+  damageTaken: number;
+  actions: number;
+}
+
 export interface BeamSearchOptions extends LegalActionOptions {
   beamWidth: number;
   branchLimit: number;
@@ -247,6 +265,7 @@ export interface BeamSearchOptions extends LegalActionOptions {
   /** Fraction of the beam reserved for death/damage-first states (0..1). */
   damageFrontierRatio: number;
   maxPlayerDeaths?: number;
+  maxDamage?: number;
   onProgress?: (stats: BeamSearchStats, incumbent: SolverResult) => void;
 }
 
@@ -256,9 +275,14 @@ export interface BeamSearchStats {
   maxNodes: number;
   damageFrontierRatio: number;
   maxPlayerDeaths?: number;
+  maxDamage?: number;
   nodesGenerated: number;
   nodesAccepted: number;
   cacheHits: number;
+  dominancePrunes: number;
+  boundPrunes: number;
+  transpositionStates: number;
+  transpositionLabels: number;
   frontierPeak: number;
   deepestTurn: number;
   incumbentSource: 'greedy' | 'beam';
@@ -268,6 +292,39 @@ export interface BeamSearchStats {
 export interface BeamSearchResult {
   result: SolverResult;
   stats: BeamSearchStats;
+}
+
+export type ProofStatus = 'found' | 'infeasible' | 'unknown';
+
+export interface ProofSearchOptions {
+  maxNodes: number;
+  maxPlayerDeaths?: number;
+  maxDamage?: number;
+  onProgress?: (stats: ProofSearchStats) => void;
+}
+
+export interface ProofSearchStats {
+  maxNodes: number;
+  prefixActions: number;
+  maxPlayerDeaths?: number;
+  maxDamage?: number;
+  nodesGenerated: number;
+  nodesAccepted: number;
+  cacheHits: number;
+  dominancePrunes: number;
+  boundPrunes: number;
+  transpositionStates: number;
+  transpositionLabels: number;
+  frontierPeak: number;
+  deepestTurn: number;
+  exhausted: boolean;
+  elapsedMs: number;
+}
+
+export interface ProofSearchResult {
+  status: ProofStatus;
+  result?: SolverResult;
+  stats: ProofSearchStats;
 }
 
 export interface SearchOptions {

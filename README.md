@@ -32,6 +32,11 @@ npm run solver -- plan --scenario solver/scenarios/chapter-4.json \
   --branch-limit 24 --max-nodes 80000 \
   --solution-out solver/solutions/chapter-4.json
 
+# Ask an exhaustive fixed-seed feasibility question (within the supported model)
+npm run solver -- prove --scenario solver/scenarios/chapter-4.json \
+  --solution solver/solutions/chapter-4.json \
+  --max-deaths 0 --max-damage 21 --max-nodes 1000000
+
 # Deterministically replay a saved solution
 npm run solver -- verify --solution solver/solutions/chapter-3.json
 npm run solver -- verify --scenario solver/scenarios/chapter-4.json \
@@ -56,6 +61,16 @@ candidates without changing the gameplay RNG stream.
 Seed-range scanning is deliberately excluded from benchmark results. The CLI
 requires `--allow-seed-search` alongside `--seed-range` and labels that path as
 non-benchmark diagnostic work.
+
+Saved benchmark solutions are fingerprinted over the gameplay scenario,
+project data, engine source, and solver transition files. `verify`, `plan`
+continuation, and `--prefix` reject stale artifacts instead of accepting a
+matching seed from a different roster, ruleset, or project revision.
+
+The planner uses exact RNG-bearing future-state hashes with Pareto dominance
+over deaths, cumulative damage, and actions. `prove` never turns a node-limited
+search into a claim: it reports `found`, exhaustive `infeasible`, or `unknown`
+when the node budget ends.
 
 The canonical Chapter 5 benchmark fixes seed `5`, requires Natasha to recruit
 Joshua, and defeats Saar in 4 turns with zero deaths and 53 cumulative damage;

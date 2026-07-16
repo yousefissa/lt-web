@@ -441,8 +441,9 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
   doors/chests, unlock consumption/rewards, and destructible-region AI effects.
 - **Search**: Deterministic fixed-seed hill climbing with multi-core policy
   shards plus action-level beam search with bounded per-actor branching,
-  objective/damage frontier diversity, protected incumbent prefixes, and a
-  SHA-256 transposition cache. Lexicographic scoring requires a clear before
+  objective/damage frontier diversity, protected incumbent prefixes,
+  irreversible incumbent bounds, and a SHA-256 future-state transposition table
+  with Pareto death/damage/action labels. Lexicographic scoring requires a clear before
   deaths, damage, turns, and action count are minimized. Seed scans are gated as
   non-benchmark diagnostics.
 - **Planner state**: Versioned checkpoints and independent clones preserve RNG,
@@ -450,7 +451,18 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
   active regions/layers/interactions, and replay state. Legal player actions are
   enumerable and validated one at a time, with deterministic enemy/other phase
   stepping and cache-stable keys. Search supports zero-death pruning and exact
-  action-prefix continuation.
+  action-prefix continuation. Beam nodes store checkpoints and reuse a simulator
+  workspace instead of reconstructing the level for every branch.
+- **Proof mode**: Complete fixed-seed legal-action DFS supports death/damage
+  feasibility bounds. It distinguishes route found, exhaustive infeasibility in
+  the supported model, and unknown due to node budget.
+- **Benchmark identity**: Saved canonical routes fingerprint gameplay scenario
+  fields, project data, engine source, and solver transition files. CLI verification,
+  continuation, and prefixes reject missing or mismatched fingerprints.
+- **Parity audit**: Solver and live browser harness expose a shared normalized
+  action-boundary snapshot plus field-level diffs for RNG, phases, units,
+  inventories, regions, and layers. Combat durability uses shared Python-LT
+  hit/miss/one-loss-per-combat semantics in solver and both visual combat paths.
 - **Replay**: Every action records a state snapshot for JSON verification and an
   interactive grid animation
 - **Chapter 3 result**: Canonical fixed seed 3 route clears in 6 turns with zero
@@ -484,6 +496,7 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
 | `support-system.ts` | ~500 | Support pairs, ranks, affinity bonuses |
 | `line-of-sight.ts` | ~170 | Bresenham LOS for fog of war |
 | `perf-monitor.ts` | ~440 | Frame budget monitor, profiling |
+| `parity.ts` | ~77 | Renderer-independent solver/live-engine state snapshots and diffs |
 
 ### Game States (`src/engine/states/`)
 | File | Lines | Purpose |
@@ -505,6 +518,7 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
 |------|------:|---------|
 | `combat-calcs.ts` | ~722 | Hit, damage, crit, avoid, weapon triangle, component dispatch |
 | `combat-solver.ts` | ~409 | Strike sequencing, vantage/desperation/miracle |
+| `combat-uses.ts` | ~33 | Shared LT durability consumption for solver/map/animation combat |
 | `animation-combat.ts` | ~1078 | GBA-style animation combat state machine |
 | `battle-animation.ts` | ~763 | Frame-by-frame pose playback |
 | `map-combat.ts` | ~555 | Map-mode combat (no animations) |
@@ -563,11 +577,14 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
 ### Solver (`solver/`)
 | File | Purpose |
 |------|---------|
-| `cli.ts` | `inspect`/`run`/`solve`/`verify` command interface |
+| `cli.ts` | `inspect`/`run`/`solve`/`plan`/`prove`/`verify` command interface |
+| `benchmark.ts` | Scenario/project/engine benchmark fingerprinting |
 | `project-loader.ts` | Filesystem `.ltproj` adapter for the engine database |
 | `event-adapter.ts` | Objective inference and standard LT event effect derivation |
 | `simulator.ts` | Fast tactical runner, cloneable checkpoints, legal actions, deterministic phase stepping, policy evaluation, and replay capture |
 | `beam-search.ts` | Fixed-seed action beam, incumbent protection, transposition cache, and explicit plan replay |
+| `proof-search.ts` | Exhaustive bounded fixed-seed feasibility search with honest proof status |
+| `transposition.ts` | Pareto dominance table for exact future-state hashes |
 | `search.ts` | Seed scans, policy mutation, hill climbing, result ordering |
 | `parallel-search.ts` / `worker.ts` | Multi-core search sharding |
 | `visualize.ts` | Standalone and Codex-inline replay renderers |

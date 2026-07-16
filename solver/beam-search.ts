@@ -1,6 +1,7 @@
 import { performance } from 'node:perf_hooks';
 import type { Database } from '../src/data/database';
 import { DEFAULT_POLICY, TacticalSimulator } from './simulator';
+import { DominanceTranspositionTable } from './transposition';
 import type {
   BeamSearchOptions,
   BeamSearchResult,
@@ -9,6 +10,7 @@ import type {
   PolicyWeights,
   SolverResult,
   SolverScenario,
+  TacticalCheckpoint,
 } from './types';
 
 export const DEFAULT_BEAM_OPTIONS: BeamSearchOptions = {
@@ -23,7 +25,7 @@ export const DEFAULT_BEAM_OPTIONS: BeamSearchOptions = {
 };
 
 interface BeamNode {
-  simulator: TacticalSimulator;
+  checkpoint: TacticalCheckpoint;
   plan: PlannerAction[];
   score: number[];
   heuristic: number;
@@ -54,25 +56,32 @@ export function beamSearchFixedSeed(
   let incumbentSource: BeamSearchStats['incumbentSource'] = incumbent === greedy ? 'greedy' : 'beam';
   const rootSimulator = createSimulatorFromPlan(db, scenario, policy, prefix);
   if (!rootSimulator.isTerminal()) rootSimulator.beginPlayerTurn();
-  rootSimulator.restoreCheckpoint(rootSimulator.createCheckpoint(false));
+  const rootCheckpoint = rootSimulator.createCheckpoint(false);
+  rootSimulator.restoreCheckpoint(rootCheckpoint);
   const root: BeamNode = {
-    simulator: rootSimulator,
+    checkpoint: rootCheckpoint,
     plan: structuredClone(prefix),
     score: rootSimulator.getEvaluationScore(),
     heuristic: 0,
     guide: prefix.every((action, index) => actionKey(action) === actionKey(guidePlan[index])),
   };
   let frontier: BeamNode[] = [root];
-  const transpositions = new Set<string>([rootSimulator.getTranspositionKey()]);
+  const transpositions = new DominanceTranspositionTable();
+  transpositions.consider(rootSimulator.getFutureStateKey(), rootSimulator.getSearchCost());
   const stats: BeamSearchStats = {
     beamWidth: options.beamWidth,
     branchLimit: options.branchLimit,
     maxNodes: options.maxNodes,
     damageFrontierRatio: options.damageFrontierRatio,
     maxPlayerDeaths: options.maxPlayerDeaths,
+    maxDamage: options.maxDamage,
     nodesGenerated: 0,
     nodesAccepted: 1,
     cacheHits: 0,
+    dominancePrunes: 0,
+    boundPrunes: 0,
+    transpositionStates: 1,
+    transpositionLabels: 1,
     frontierPeak: 1,
     deepestTurn: 1,
     incumbentSource,
@@ -83,27 +92,30 @@ export function beamSearchFixedSeed(
     const candidates: BeamNode[] = [];
     for (const node of frontier) {
       if (stats.nodesGenerated >= options.maxNodes) break;
-      const legal = node.simulator.enumerateLegalActions(options);
+      rootSimulator.restoreCheckpoint(node.checkpoint);
+      const legal = rootSimulator.enumerateLegalActions(options);
       const preferred = node.guide ? guidePlan[node.plan.length] : undefined;
       const branches = selectDiverseBranches(legal, options.branchLimit, preferred);
       for (const action of branches) {
         if (stats.nodesGenerated >= options.maxNodes) break;
         stats.nodesGenerated++;
-        const simulator = node.simulator.clone(false);
-        simulator.applyPlayerAction(action);
+        rootSimulator.restoreCheckpoint(node.checkpoint);
+        rootSimulator.applyPlayerAction(action);
         const plan = [...node.plan, structuredClone(action)];
         const followsGuide = node.guide && !!preferred && actionKey(action) === actionKey(preferred);
 
-        if (simulator.isPlayerTurnComplete() && !simulator.isTerminal()) {
-          simulator.finishTurn();
-          if (!simulator.isTerminal()) simulator.beginPlayerTurn();
+        if (rootSimulator.isPlayerTurnComplete() && !rootSimulator.isTerminal()) {
+          rootSimulator.finishTurn();
+          if (!rootSimulator.isTerminal()) rootSimulator.beginPlayerTurn();
         }
 
-        const score = simulator.getEvaluationScore();
-        if (options.maxPlayerDeaths !== undefined
-          && simulator.getPlayerDeaths() > options.maxPlayerDeaths) continue;
-        if (simulator.isTerminal()) {
-          const result = { ...simulator.getResult(), plan };
+        const score = rootSimulator.getEvaluationScore();
+        if (violatesIrreversibleBounds(rootSimulator, incumbent, options)) {
+          stats.boundPrunes++;
+          continue;
+        }
+        if (rootSimulator.isTerminal()) {
+          const result = { ...rootSimulator.getResult(), plan };
           if (result.metrics.cleared && compareScores(result.score, incumbent.score) < 0) {
             incumbent = replayPlannedSolution(db, scenario, policy, plan);
             incumbentSource = 'beam';
@@ -111,16 +123,17 @@ export function beamSearchFixedSeed(
           continue;
         }
 
-        const key = simulator.getTranspositionKey();
-        if (transpositions.has(key) && !followsGuide) {
+        const key = rootSimulator.getFutureStateKey();
+        const decision = transpositions.consider(key, rootSimulator.getSearchCost());
+        if ((decision === 'duplicate' || decision === 'dominated') && !followsGuide) {
           stats.cacheHits++;
+          if (decision === 'dominated') stats.dominancePrunes++;
           continue;
         }
-        if (!transpositions.has(key)) transpositions.add(key);
         stats.nodesAccepted++;
-        stats.deepestTurn = Math.max(stats.deepestTurn, simulator.getCurrentTurn());
+        stats.deepestTurn = Math.max(stats.deepestTurn, rootSimulator.getCurrentTurn());
         candidates.push({
-          simulator,
+          checkpoint: rootSimulator.createCheckpoint(false),
           plan,
           score,
           heuristic: node.heuristic + action.heuristic,
@@ -132,11 +145,15 @@ export function beamSearchFixedSeed(
     frontier = selectFrontier(candidates, options.beamWidth, options.damageFrontierRatio);
     stats.frontierPeak = Math.max(stats.frontierPeak, frontier.length);
     stats.incumbentSource = incumbentSource;
+    stats.transpositionStates = transpositions.stateCount;
+    stats.transpositionLabels = transpositions.labelCount;
     stats.elapsedMs = performance.now() - started;
     options.onProgress?.({ ...stats }, incumbent);
   }
 
   stats.incumbentSource = incumbentSource;
+  stats.transpositionStates = transpositions.stateCount;
+  stats.transpositionLabels = transpositions.labelCount;
   stats.elapsedMs = performance.now() - started;
   const result: SolverResult = {
     ...incumbent,
@@ -159,7 +176,7 @@ export function replayPlannedSolution(
   return { ...result, plan: structuredClone(plan) };
 }
 
-function createSimulatorFromPlan(
+export function createSimulatorFromPlan(
   db: Database,
   scenario: SolverScenario,
   policy: PolicyWeights,
@@ -311,4 +328,27 @@ function validateOptions(options: BeamSearchOptions): void {
     && (!Number.isInteger(options.maxPlayerDeaths) || options.maxPlayerDeaths < 0)) {
     throw new Error('maxPlayerDeaths must be a non-negative integer');
   }
+  if (options.maxDamage !== undefined
+    && (!Number.isInteger(options.maxDamage) || options.maxDamage < 0)) {
+    throw new Error('maxDamage must be a non-negative integer');
+  }
+}
+
+function violatesIrreversibleBounds(
+  simulator: TacticalSimulator,
+  incumbent: SolverResult,
+  options: BeamSearchOptions,
+): boolean {
+  const cost = simulator.getSearchCost();
+  if (options.maxPlayerDeaths !== undefined && cost.playerDeaths > options.maxPlayerDeaths) return true;
+  if (options.maxDamage !== undefined && cost.damageTaken > options.maxDamage) return true;
+  if (!incumbent.metrics.cleared) return false;
+  if (cost.playerDeaths > incumbent.metrics.playerDeaths) return true;
+  if (cost.playerDeaths < incumbent.metrics.playerDeaths) return false;
+  if (cost.damageTaken > incumbent.metrics.damageTaken) return true;
+  if (cost.damageTaken < incumbent.metrics.damageTaken) return false;
+  if (simulator.getCurrentTurn() > incumbent.metrics.turns) return true;
+  return simulator.getCurrentTurn() === incumbent.metrics.turns
+    && cost.actions >= incumbent.metrics.actions
+    && !simulator.isTerminal();
 }

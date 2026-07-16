@@ -58,13 +58,15 @@ game loop is **replaced** with a programmatic API exposed on `window.__harness`:
 | `setSeed(seed)` | Install a deterministic gameplay RNG stream for combat and level-ups |
 | `clearSeed()` | Restore normal `Math.random`-backed gameplay randomness |
 | `getSeedState()` | Read the current deterministic RNG state, or `null` when unseeded |
+| `getParityState()` | Capture normalized turn/phase/RNG/unit/item/region/layer state for solver differential checks |
 
 ### Headless Solver Tests
 
 The solver test suite covers seeded RNG, deterministic Chapter 3 and Chapter 4
 clears, exact checkpoint cloning, legal action application, explicit plan replay,
-fixed-seed beam search, standard event derivation, magic-damage parity, and
-parallel diagnostic seed-search equivalence through the real database,
+fixed-seed beam/proof search, dominance caching, benchmark fingerprints,
+engine parity snapshots, combat durability semantics, standard event
+derivation, magic-damage parity, and parallel diagnostic seed-search equivalence through the real database,
 pathfinding, enemy AI, and combat systems:
 
 ```bash
@@ -87,15 +89,30 @@ npm run solver -- solve --scenario solver/scenarios/chapter-4.json \
 npm run solver -- plan --scenario solver/scenarios/chapter-4.json \
   --solution solver/solutions/chapter-4.json --beam-width 32 \
   --branch-limit 12 --max-nodes 30000
+npm run solver -- prove --scenario solver/scenarios/chapter-4.json \
+  --solution solver/solutions/chapter-4.json \
+  --max-deaths 0 --max-damage 21 --max-nodes 1000000
 ```
 
 `plan` never scans gameplay seeds. It branches over validated player actions,
 restores exact RNG-bearing checkpoints, rejects transpositions by a canonical
-state digest, and verifies saved routes by replaying the explicit action list.
+future-state digest plus Pareto path-cost dominance, and verifies saved routes
+by replaying the explicit action list. Saved artifacts also carry a benchmark
+fingerprint for scenario, project data, engine source, and solver transition files.
 `--max-deaths 0` prunes a search to survival routes, while `--prefix FILE`
 continues from a validated turn-stamped action prefix without changing RNG.
 Interaction coverage derives Chapter 5 visits/Natasha→Joshua/destructible
 villages and Chapter 3 chest/door rules, including lockpick use and rewards.
+`prove` enumerates the complete supported legal-action tree and says
+`infeasible` only after exhaustion; hitting its node budget is `unknown`.
+
+When the bundled Playwright browser is unavailable, run harness checks against
+an existing Chrome installation with:
+
+```bash
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  npm run test:harness
+```
 
 ### Sacred Stones Reliability Soak
 

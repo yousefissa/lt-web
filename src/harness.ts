@@ -20,6 +20,7 @@ import type { InputEvent, GameButton } from './engine/input';
 import { FRAMETIME, updateAnimationCounters } from './engine/constants';
 import { ItemObject } from './objects/item';
 import { clearRandomSeed, getRandomState, setRandomSeed } from './engine/random';
+import type { EngineParityState } from './engine/parity';
 
 export interface HarnessAPI {
   /** Step the game forward by N frames. Optionally inject an input on the first frame. */
@@ -28,6 +29,8 @@ export interface HarnessAPI {
   screenshot: () => Promise<string>;
   /** Get a snapshot of current game state. */
   getState: () => HarnessState;
+  /** Get a renderer-independent snapshot for solver/engine differential checks. */
+  getParityState: () => EngineParityState;
   /** Queue an input for the next stepFrames call. */
   injectInput: (button: GameButton) => void;
   /** Load a level by NID and transition to the free state. */
@@ -133,7 +136,7 @@ export function installHarness(
           nid: unit.nid,
           name: unit.name,
           team: unit.team,
-          position: unit.position ? [unit.position[0], unit.position[1]] : null,
+          position: unit.position ? [unit.position[0], unit.position[1]] as [number, number] : null,
           hp: unit.currentHp,
           maxHp: unit.stats['HP'] ?? 0,
           isDead: unit.isDead(),
@@ -154,6 +157,35 @@ export function installHarness(
         cursorPos: game.cursor.getPosition(),
         units,
         levelNid: game.currentLevel?.nid ?? null,
+      };
+    },
+
+    getParityState(): EngineParityState {
+      return {
+        turn: game.turnCount,
+        phase: game.phase?.getCurrent() ?? null,
+        rngState: getRandomState(),
+        units: Array.from(game.units.values()).map((unit) => ({
+          nid: unit.nid,
+          team: unit.team,
+          klass: unit.klass,
+          level: unit.level,
+          exp: unit.exp,
+          hp: unit.currentHp,
+          maxHp: unit.maxHp,
+          position: unit.position ? [unit.position[0], unit.position[1]] as [number, number] : null,
+          dead: unit.isDead(),
+          hasAttacked: unit.hasAttacked,
+          hasMoved: unit.hasMoved,
+          hasTraded: unit.hasTraded,
+          finished: unit.finished,
+          items: unit.items.map((item) => ({ nid: item.nid, uses: item.uses })),
+        })).sort((a, b) => a.nid.localeCompare(b.nid)),
+        activeRegions: (game.currentLevel?.regions ?? []).map((region) => region.nid).sort(),
+        visibleLayers: (game.tilemap?.layers ?? [])
+          .filter((layer) => layer.visible)
+          .map((layer) => layer.nid)
+          .sort(),
       };
     },
 

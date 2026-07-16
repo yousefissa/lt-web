@@ -2,6 +2,7 @@ import type { UnitObject } from '../objects/unit';
 import type { ItemObject } from '../objects/item';
 import type { CombatStrike } from './combat-solver';
 import { CombatPhaseSolver, type RngMode } from './combat-solver';
+import { consumeCombatItemUses } from './combat-uses';
 import type { CombatResults, DamagePopup } from './map-combat';
 import { BattleAnimation, type BattleAnimDrawData } from './battle-animation';
 import type { CombatEffectData, PaletteData } from './battle-anim-types';
@@ -1050,20 +1051,12 @@ export class AnimationCombat implements AnimationCombatOwner {
     let attackWeaponBroke = false;
     let defenseWeaponBroke = false;
 
-    if (attackerStrikeCount > 0 && this.attackItem.maxUses > 0) {
-      attackWeaponBroke = this.attackItem.decrementUses();
-      if (attackWeaponBroke) {
-        const idx = this.attacker.items.indexOf(this.attackItem);
-        if (idx !== -1) this.attacker.items.splice(idx, 1);
-      }
+    if (attackerStrikeCount > 0) {
+      attackWeaponBroke = consumeCombatItemUses(this.attacker, this.attackItem, this.strikes);
     }
 
-    if (defenderStrikeCount > 0 && this.defenseItem && this.defenseItem.maxUses > 0) {
-      defenseWeaponBroke = this.defenseItem.decrementUses();
-      if (defenseWeaponBroke) {
-        const idx = this.defender.items.indexOf(this.defenseItem);
-        if (idx !== -1) this.defender.items.splice(idx, 1);
-      }
+    if (defenderStrikeCount > 0 && this.defenseItem) {
+      defenseWeaponBroke = consumeCombatItemUses(this.defender, this.defenseItem, this.strikes);
     }
 
     // EXP

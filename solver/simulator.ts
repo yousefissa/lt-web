@@ -12,6 +12,7 @@ import {
   type CombatStrike,
   type RngMode,
 } from '../src/combat/combat-solver';
+import { consumeCombatItemUses } from '../src/combat/combat-uses';
 import type { Database } from '../src/data/database';
 import type {
   GenericUnitData,
@@ -23,6 +24,7 @@ import type {
   UnitPrefab,
 } from '../src/data/types';
 import { SeededRandom } from '../src/engine/random';
+import type { EngineParityState } from '../src/engine/parity';
 import { GameBoard } from '../src/objects/game-board';
 import { ItemObject } from '../src/objects/item';
 import { SkillObject } from '../src/objects/skill';
@@ -53,6 +55,7 @@ import type {
   SolverPhase,
   SolverResult,
   SolverScenario,
+  SearchCost,
   StrikeRecord,
   TacticalCheckpoint,
   TacticalUnitCheckpoint,
@@ -340,6 +343,14 @@ export class TacticalSimulator {
 
   getPlayerDeaths(): number {
     return this.metrics.playerDeaths;
+  }
+
+  getSearchCost(): SearchCost {
+    return {
+      playerDeaths: this.metrics.playerDeaths,
+      damageTaken: this.metrics.damageTaken,
+      actions: this.metrics.actions,
+    };
   }
 
   getEvaluationScore(): number[] {
@@ -773,6 +784,35 @@ export class TacticalSimulator {
     return createHash('sha256').update(JSON.stringify(checkpoint)).digest('base64url');
   }
 
+  /**
+   * Hash only state that can affect the future. Already-paid score metrics are
+   * deliberately excluded and compared by the dominance table instead.
+   */
+  getFutureStateKey(): string {
+    const checkpoint = this.createCheckpoint(false);
+    return TacticalSimulator.getFutureStateKey(checkpoint);
+  }
+
+  static getFutureStateKey(checkpoint: TacticalCheckpoint): string {
+    const futureState = {
+      version: checkpoint.version,
+      currentTurn: checkpoint.currentTurn,
+      currentPhase: checkpoint.currentPhase,
+      playerPhasePrepared: checkpoint.playerPhasePrepared,
+      rngState: checkpoint.rngState,
+      firedEventRules: checkpoint.firedEventRules,
+      activeRegions: checkpoint.activeRegions,
+      visibleLayers: checkpoint.visibleLayers,
+      completedInteractions: checkpoint.completedInteractions,
+      visitedRegions: checkpoint.visitedRegions,
+      openedChests: checkpoint.openedChests,
+      openedDoors: checkpoint.openedDoors,
+      destroyedRegions: checkpoint.destroyedRegions,
+      units: checkpoint.units,
+    };
+    return createHash('sha256').update(JSON.stringify(futureState)).digest('base64url');
+  }
+
   getAsciiMap(): string {
     const rows: string[] = [];
     for (let y = 0; y < this.board.height; y++) {
@@ -801,6 +841,33 @@ export class TacticalSimulator {
 
   getMapSnapshot(): MapSnapshot {
     return this.mapSnapshot();
+  }
+
+  /** Snapshot for action-boundary comparison with window.__harness. */
+  getParityState(): EngineParityState {
+    return {
+      turn: this.currentTurn,
+      phase: this.currentPhase,
+      rngState: this.rng.getState(),
+      units: Array.from(this.units.values()).map((unit) => ({
+        nid: unit.nid,
+        team: unit.team,
+        klass: unit.klass,
+        level: unit.level,
+        exp: unit.exp,
+        hp: unit.currentHp,
+        maxHp: unit.maxHp,
+        position: clonePosition(unit.position),
+        dead: unit.isDead(),
+        hasAttacked: unit.hasAttacked,
+        hasMoved: unit.hasMoved,
+        hasTraded: unit.hasTraded,
+        finished: unit.finished,
+        items: unit.items.map((item) => ({ nid: item.nid, uses: item.uses })),
+      })).sort((a, b) => a.nid.localeCompare(b.nid)),
+      activeRegions: Array.from(this.activeRegions).sort(),
+      visibleLayers: Array.from(this.visibleLayers).sort(),
+    };
   }
 
   private initializeTerrain(): void {
@@ -1330,8 +1397,10 @@ export class TacticalSimulator {
     const records: StrikeRecord[] = [];
     for (const strike of strikes) {
       records.push(this.applyStrike(strike));
-      strike.item.decrementUses();
     }
+    const usedItems = new Map<ItemObject, UnitObject>();
+    for (const strike of strikes) usedItems.set(strike.item, strike.attacker);
+    for (const [usedItem, owner] of usedItems) consumeCombatItemUses(owner, usedItem, strikes);
     this.metrics.actions++;
     this.metrics.combats++;
     const summary = records.map((strike) => `${strike.attacker}${strike.hit ? ` ${strike.damage}` : ' miss'}${strike.crit ? ' crit' : ''}`).join(', ');
