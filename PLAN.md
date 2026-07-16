@@ -144,7 +144,15 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
     dispatched destructible rules; it now executes any matching regional event,
     consumes valid unlock uses, applies layers/regions, and marks the LT
     interaction action. The manifests were invalidated and regenerated again
-    before the final benchmark run. Solver tests are 27/27.
+    before the final benchmark run. Further representative replay auditing
+    repaired four latent live/headless differences against Python LT: layer
+    visibility now rebuilds live movement/FOW grids and clears stale solver
+    terrain, seize requires the explicit `win_game` interaction instead of
+    merely occupying the tile, dead units retain their phase flags, and the
+    final non-combat use removes a broken item. Chapter 3 representative routes
+    now match the live engine at every action boundary. The affected artifacts
+    were invalidated once more; final manifests will be committed before the
+    clean rerun. Solver tests are 30/30.
 
 - **Chapter 5 live differential matrix + exact checkpoint restoration:**
   - Generalized the saved-route Playwright differential into a Chapter 4/5

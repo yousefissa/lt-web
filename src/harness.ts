@@ -243,6 +243,7 @@ export function installHarness(
   async function settlePlannerBoundary(
     maxFrames: number,
     trace?: HarnessPlannerTraceEntry[],
+    explicitTerminal: boolean = false,
   ): Promise<number> {
     let previousState: string | null = null;
     let previousActor: string | null = null;
@@ -279,7 +280,7 @@ export function installHarness(
       const events = game.eventManager?.hasActiveEvents() ?? false;
       const players = game.board?.getTeamUnits('player') ?? [];
       const allFinished = players.length > 0 && players.every((unit) => unit.finished || unit.isDead());
-      const terminal = game.checkWinCondition() || game.checkLossCondition();
+      const terminal = explicitTerminal || game.checkWinCondition() || game.checkLossCondition();
       // Capture the completed tactical boundary before victory/loss events
       // advance into the next chapter or game-over UI.
       if (terminal && current !== 'combat' && !moving) return frame;
@@ -629,7 +630,23 @@ export function installHarness(
         ? [origin]
         : game.pathSystem.getValidMoves(unit, game.board);
       if (!validMoves.some(([x, y]) => x === action.position[0] && y === action.position[1])) {
-        throw new Error(`Illegal live destination ${action.position.join(',')} for ${action.actor}`);
+        const destinationOccupant = game.board.getUnit(action.position[0], action.position[1]);
+        const movementGroup = game.db.classes.get(unit.klass)?.movement_group ?? 'Infantry';
+        throw new Error(`Illegal live destination ${action.position.join(',')} for ${action.actor}: ${JSON.stringify({
+          origin,
+          movement: unit.getStatValue('MOV'),
+          movementGroup,
+          destinationCost: game.board.getMovementCost(
+            action.position[0],
+            action.position[1],
+            movementGroup,
+            game.db,
+          ),
+          destinationOccupant: destinationOccupant?.nid ?? null,
+          hasMoved: unit.hasMoved,
+          hasTraded: unit.hasTraded,
+          validMoves,
+        })}`);
       }
 
       if (action.type === 'wait' && (origin[0] !== action.position[0] || origin[1] !== action.position[1])) {
@@ -759,14 +776,14 @@ export function installHarness(
       try {
         // Flush the queued CombatState or let FreeState observe a completed unit.
         stepOneFrame(null);
-        frames = 1 + await settlePlannerBoundary(maxFrames, trace);
+        frames = 1 + await settlePlannerBoundary(maxFrames, trace, action.type === 'seize');
       } finally {
         aiController.getAction = originalGetAction;
       }
       return {
         frames,
         state: parityState(),
-        terminal: game.checkWinCondition() || game.checkLossCondition(),
+        terminal: action.type === 'seize' || game.checkWinCondition() || game.checkLossCondition(),
         trace,
         aiActions,
       };

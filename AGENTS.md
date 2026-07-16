@@ -441,7 +441,8 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
   before their matching phases, as in Python LT. It also derives visits, directional talks/recruitment,
   doors/chests, unlock consumption/rewards, destructible-region AI effects,
   repeatable turn/region triggers, off-map recruit placement, and regional
-  `Interact` AI for destructibles, doors, and chests.
+  `Interact` AI for destructibles, doors, and chests. Layer commands rebuild
+  movement/FOW grids on both live and headless paths.
 - **Search**: Deterministic fixed-seed hill climbing with multi-core policy
   shards plus action-level beam search with bounded per-actor branching,
   objective/damage frontier diversity, protected incumbent prefixes,
@@ -472,7 +473,8 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
   checkpoint restoration can materialize carried roster units absent from the
   chapter prefab. Legal player actions are
   enumerable and validated one at a time, with deterministic enemy/other phase
-  stepping and cache-stable keys. Search supports zero-death pruning and exact
+  stepping, LT-preserved dead-unit phase flags, broken non-combat item removal,
+  and cache-stable keys. Search supports zero-death pruning and exact
   action-prefix continuation. Beam nodes store checkpoints and reuse a simulator
   workspace instead of reconstructing the level for every branch.
 - **Proof mode**: Complete fixed-seed legal-action DFS supports death/damage
@@ -484,9 +486,11 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
 - **Parity audit**: Solver and live browser harness expose a shared normalized
   action-boundary snapshot plus field-level diffs for RNG, phases, units,
   inventories/equipment, regions, and layers. The saved Chapter 4 and Chapter 5
-  routes are replayed through live attacks, heals, moves, waits, visits, talks,
-  doors, chests, recruitment, and phase transitions. Combat durability and
-  combat EXP use shared semantics in the solver and both visual combat paths.
+  routes plus representative Chapter 3 global-policy traces are replayed
+  through live attacks, heals, moves, waits, visits, talks, doors, chests,
+  recruitment, explicit seize, and phase transitions. Combat durability,
+  non-combat breakage, and combat EXP use shared semantics in the solver and
+  both visual combat paths.
 - **Replay**: Every action records a state snapshot for JSON verification and an
   interactive grid animation
 - **Chapter 3 result**: Canonical fixed seed 3 policy clears in 7 turns/86

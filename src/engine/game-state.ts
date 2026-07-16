@@ -739,25 +739,10 @@ export class GameState {
       return hadBoss;
     }
 
-    // Seize: a player unit is on a 'seize' region (region_type === 'event', sub_nid === 'Seize')
+    // Seize is interaction-driven in LT: merely standing on the region is not
+    // victory. The Seize event's win_game command sets this flag.
     if (win.includes('seize')) {
-      if (this.currentLevel.regions) {
-        for (const region of this.currentLevel.regions) {
-          if (region.region_type.toLowerCase() === 'event' && region.sub_nid === 'Seize') {
-            const [rx, ry] = region.position;
-            const [rw, rh] = region.size;
-            for (let tx = rx; tx < rx + rw; tx++) {
-              for (let ty = ry; ty < ry + rh; ty++) {
-                const unit = this.board?.getUnit(tx, ty);
-                if (unit && unit.team === 'player') {
-                  return true;
-                }
-              }
-            }
-          }
-        }
-      }
-      return false;
+      return this.levelVars.get('_win_game') === true;
     }
 
     // Survive X turns: parse turn count from condition

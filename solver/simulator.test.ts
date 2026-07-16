@@ -126,6 +126,55 @@ test('planner checkpoints clone exact RNG, unit, inventory, and turn state', {
   assert.deepEqual(clone.getResult().finalUnits, simulator.getResult().finalUnits);
 });
 
+test('new phases preserve action flags on dead units like LT ResetAll', {
+  skip: !existsSync(projectPath),
+}, async () => {
+  const { db } = await loadSolverProject(projectPath);
+  const scenario = JSON.parse(await readFile('solver/scenarios/chapter-3.json', 'utf8')) as SolverScenario;
+  const simulator = new TacticalSimulator(db, scenario);
+  const checkpoint = simulator.createCheckpoint(false);
+  const franz = checkpoint.units.find((unit) => unit.nid === 'Franz');
+  assert.ok(franz);
+  franz.dead = true;
+  franz.currentHp = 0;
+  franz.position = null;
+  franz.hasAttacked = true;
+  franz.hasMoved = true;
+  franz.finished = true;
+  simulator.restoreCheckpoint(checkpoint);
+  simulator.beginPlayerTurn();
+
+  const restored = simulator.createCheckpoint(false).units.find((unit) => unit.nid === 'Franz');
+  assert.equal(restored?.hasAttacked, true);
+  assert.equal(restored?.hasMoved, true);
+  assert.equal(restored?.finished, true);
+});
+
+test('the final non-combat item use removes the broken item', {
+  skip: !existsSync(projectPath),
+}, async () => {
+  const { db } = await loadSolverProject(projectPath);
+  const scenario = JSON.parse(await readFile(scenarioPath, 'utf8')) as SolverScenario;
+  const simulator = new TacticalSimulator(db, scenario);
+  const checkpoint = simulator.createCheckpoint(false);
+  const vanessa = checkpoint.units.find((unit) => unit.nid === 'Vanessa');
+  assert.ok(vanessa);
+  vanessa.currentHp = Math.max(1, vanessa.stats.HP - 5);
+  const vulnerary = vanessa.items.find((item) => item.nid === 'Vulnerary');
+  assert.ok(vulnerary);
+  vulnerary.uses = 1;
+  simulator.restoreCheckpoint(checkpoint);
+  simulator.beginPlayerTurn();
+  const heal = simulator.enumerateLegalActions().find(
+    (action) => action.type === 'heal' && action.actor === 'Vanessa' && action.item === 'Vulnerary',
+  );
+  assert.ok(heal);
+  simulator.applyPlayerAction(heal);
+
+  assert.ok(!simulator.getResult().finalUnits.find((unit) => unit.nid === 'Vanessa')
+    ?.items.some((item) => item.nid === 'Vulnerary'));
+});
+
 test('future-state identity excludes already-paid path cost', {
   skip: !existsSync(projectPath),
 }, async () => {

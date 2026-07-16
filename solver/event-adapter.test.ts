@@ -102,6 +102,46 @@ test('standard adapter derives reusable visit, talk, door, chest, and destructib
   assert.equal(chapter3.interactionRules.filter((rule) => rule.type === 'door').length, 3);
 });
 
+test('showing and hiding terrain layers rebuilds movement costs from visible layers', {
+  skip: !existsSync(projectPath),
+}, async () => {
+  const { db } = await loadSolverProject(projectPath);
+  const scenario: SolverScenario = {
+    name: 'Chapter 3 door terrain fixture',
+    levelNid: '3',
+    seed: 3,
+    maxTurns: 1,
+    objective: 'seize',
+    eventAdapter: 'standard',
+    team: {
+      Moulder: { level: 3, items: ['Heal'], position: [6, 11] },
+    },
+  };
+  const simulator = new TacticalSimulator(db, scenario);
+  const checkpoint = simulator.createCheckpoint(false);
+  assert.ok(!checkpoint.visibleLayers.includes('Door2'));
+  checkpoint.visibleLayers.push('Door2');
+  simulator.restoreCheckpoint(checkpoint);
+  simulator.beginPlayerTurn();
+
+  assert.ok(simulator.enumerateLegalActions().some(
+    (action) => action.type === 'move'
+      && action.actor === 'Moulder'
+      && action.position[0] === 7
+      && action.position[1] === 7,
+  ));
+
+  const openedCheckpoint = simulator.createCheckpoint(false);
+  openedCheckpoint.visibleLayers = openedCheckpoint.visibleLayers.filter((nid) => nid !== 'Door2');
+  simulator.restoreCheckpoint(openedCheckpoint);
+  assert.ok(!simulator.enumerateLegalActions().some(
+    (action) => action.type === 'move'
+      && action.actor === 'Moulder'
+      && action.position[0] === 7
+      && action.position[1] === 7,
+  ));
+});
+
 test('planner interactions consume unlock uses, grant rewards, and recruit directionally', {
   skip: !existsSync(projectPath),
 }, async () => {

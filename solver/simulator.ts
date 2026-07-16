@@ -327,7 +327,9 @@ export class TacticalSimulator {
     this.currentPhase = 'player';
     this.runEventSpawns('player');
     this.runScriptedSpawns('player');
-    for (const unit of this.playerUnits()) unit.resetTurnState();
+    for (const unit of this.playerUnits()) {
+      if (!unit.isDead()) unit.resetTurnState();
+    }
     this.playerPhasePrepared = true;
     this.refreshOutcome();
   }
@@ -892,6 +894,11 @@ export class TacticalSimulator {
   }
 
   private initializeTerrain(): void {
+    for (let y = 0; y < this.tilemap.size[1]; y++) {
+      for (let x = 0; x < this.tilemap.size[0]; x++) {
+        this.board.setTerrain(x, y, '0');
+      }
+    }
     for (const layer of this.tilemap.layers) {
       if (!this.visibleLayers.has(layer.nid)) continue;
       for (const [key, terrainNid] of Object.entries(layer.terrain_grid)) {
@@ -1144,7 +1151,9 @@ export class TacticalSimulator {
 
   private runPlayerPhase(): void {
     this.currentPhase = 'player';
-    for (const unit of this.playerUnits()) unit.resetTurnState();
+    for (const unit of this.playerUnits()) {
+      if (!unit.isDead()) unit.resetTurnState();
+    }
 
     let guard = 0;
     while (!this.cleared && !this.lost && guard++ < this.playerUnits().length * 3) {
@@ -1298,7 +1307,7 @@ export class TacticalSimulator {
         if (rule.type === 'chest' || rule.type === 'door') {
           const unlock = unit.items.find((item) => this.itemCanUnlock(unit, item, region));
           if (!unlock) return;
-          unlock.decrementUses();
+          this.consumeNonCombatItemUse(unit, unlock);
         }
         this.executeInteractionRule(rule, unit, region);
         if (!unit.isDead()) unit.hasAttacked = true;
@@ -1315,7 +1324,7 @@ export class TacticalSimulator {
           action.item.getHealAmount(unit.getStatValue('MAG')),
         );
         action.targetUnit.currentHp += amount;
-        action.item.decrementUses();
+        this.consumeNonCombatItemUse(unit, action.item);
         this.metrics.actions++;
         this.recordStep('heal', `${unit.name} heals ${action.targetUnit.name} for ${amount}`, unit, unit.position, action.targetUnit, action.item);
       } else {
@@ -1526,7 +1535,7 @@ export class TacticalSimulator {
     const before = candidate.target.currentHp;
     candidate.target.currentHp = Math.min(candidate.target.maxHp, before + candidate.amount);
     const healed = candidate.target.currentHp - before;
-    candidate.item.decrementUses();
+    this.consumeNonCombatItemUse(candidate.unit, candidate.item);
     candidate.unit.finished = true;
     this.metrics.actions++;
     this.metrics.healingReceived += healed;
@@ -1570,12 +1579,14 @@ export class TacticalSimulator {
     unit.hasMoved = unit.hasMoved || !samePosition(from, action.position);
     if (action.type === 'talk') unit.hasTraded = true;
 
+    let usedItem: ItemObject | undefined;
     if (action.type === 'chest' || action.type === 'door') {
       const item = action.itemIndex === undefined ? undefined : unit.items[action.itemIndex];
       if (!item || item.nid !== action.item || !region || !this.itemCanUnlock(unit, item, region)) {
         throw new Error(`Invalid unlock item for ${action.type} ${action.region}`);
       }
-      item.decrementUses();
+      usedItem = item;
+      this.consumeNonCombatItemUse(unit, item);
     }
 
     this.executeInteractionRule(rule, unit, region);
@@ -1584,7 +1595,7 @@ export class TacticalSimulator {
       ? `${unit.name} talks to ${this.units.get(action.target ?? '')?.name ?? action.target}`
       : `${unit.name} uses ${action.type} at ${action.region}`;
     this.recordStep(action.type, label, unit, action.position, this.units.get(action.target ?? ''),
-      action.itemIndex === undefined ? undefined : unit.items[action.itemIndex], undefined, from);
+      usedItem, undefined, from);
   }
 
   private executeInteractionRule(
@@ -1763,13 +1774,7 @@ export class TacticalSimulator {
   }
 
   private rebuildTerrain(): void {
-    for (const layer of this.tilemap.layers) {
-      if (!this.visibleLayers.has(layer.nid)) continue;
-      for (const [key, terrainNid] of Object.entries(layer.terrain_grid)) {
-        const [x, y] = key.split(',').map(Number);
-        this.board.setTerrain(x, y, terrainNid);
-      }
-    }
+    this.initializeTerrain();
   }
 
   private levelWithActiveRegions(): LevelPrefab {
@@ -1836,6 +1841,15 @@ export class TacticalSimulator {
       if (this.isWall(unit)) this.metrics.wallsBroken++;
       else this.metrics.enemiesDefeated++;
     }
+  }
+
+  private consumeNonCombatItemUse(unit: UnitObject, item: ItemObject): boolean {
+    const broken = item.decrementUses();
+    if (!broken) return false;
+    const inventoryIndex = unit.items.indexOf(item);
+    if (inventoryIndex >= 0) unit.items.splice(inventoryIndex, 1);
+    unit.unequipWeapon(item);
+    return true;
   }
 
   private refreshOutcome(): void {

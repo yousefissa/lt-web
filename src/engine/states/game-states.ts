@@ -7604,6 +7604,8 @@ export class EventState extends State {
         const layerNid = args[0] ?? '';
         if (game.tilemap) {
           game.tilemap.showLayer(layerNid);
+          game.board?.initFromTilemap(game.tilemap);
+          game.recalculateAllFow();
         }
         this.advancePointer();
         return false;
@@ -7613,6 +7615,8 @@ export class EventState extends State {
         const layerNid2 = args[0] ?? '';
         if (game.tilemap) {
           game.tilemap.hideLayer(layerNid2);
+          game.board?.initFromTilemap(game.tilemap);
+          game.recalculateAllFow();
         }
         this.advancePointer();
         return false;
