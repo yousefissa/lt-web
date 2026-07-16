@@ -3,7 +3,7 @@
   "levelNid": "5",
   "objective": "defeat_boss",
   "seed": 5,
-  "rngState": 3960108716,
+  "rngState": 1929143012,
   "rngMode": "true_hit",
   "policy": {
     "kill": 90,
@@ -44,23 +44,23 @@
   "metrics": {
     "cleared": true,
     "lost": false,
-    "turns": 5,
-    "actions": 90,
-    "combats": 36,
+    "turns": 10,
+    "actions": 155,
+    "combats": 41,
     "damageTaken": 66,
-    "healingReceived": 21,
+    "healingReceived": 44,
     "playerDeaths": 1,
-    "enemiesDefeated": 19,
+    "enemiesDefeated": 22,
     "wallsBroken": 0,
-    "remainingPlayerHp": 168,
-    "remainingEnemyHp": 22
+    "remainingPlayerHp": 205,
+    "remainingEnemyHp": 0
   },
   "score": [
     0,
     1,
     66,
-    5,
-    90
+    10,
+    155
   ],
   "plan": [
     {
@@ -192,7 +192,7 @@
         9,
         10
       ],
-      "heuristic": 342.28499999999997
+      "heuristic": 369.20193548387095
     },
     {
       "type": "move",
@@ -219,20 +219,10 @@
       "turn": 2,
       "actor": "Neimi",
       "position": [
-        11,
-        20
-      ],
-      "heuristic": 25
-    },
-    {
-      "type": "move",
-      "turn": 2,
-      "actor": "Ross",
-      "position": [
         12,
         20
       ],
-      "heuristic": 24
+      "heuristic": 37
     },
     {
       "type": "move",
@@ -240,30 +230,29 @@
       "actor": "Natasha",
       "position": [
         9,
-        14
+        12
       ],
-      "heuristic": 12.519999999999996
+      "heuristic": 35.61
     },
     {
       "type": "move",
       "turn": 2,
       "actor": "Artur",
       "position": [
-        6,
-        16
+        11,
+        20
       ],
-      "heuristic": 2
+      "heuristic": 14
     },
     {
-      "type": "visit",
-      "turn": 3,
-      "actor": "Vanessa",
-      "region": "Village4",
+      "type": "move",
+      "turn": 2,
+      "actor": "Ross",
       "position": [
-        5,
-        1
+        8,
+        18
       ],
-      "heuristic": 10060
+      "heuristic": 0
     },
     {
       "type": "visit",
@@ -279,247 +268,688 @@
     {
       "type": "attack",
       "turn": 3,
-      "actor": "Eirika",
-      "target": "116",
-      "item": "Rapier",
-      "itemIndex": 0,
-      "position": [
-        10,
-        15
-      ],
-      "heuristic": 200.51999999999998
-    },
-    {
-      "type": "attack",
-      "turn": 3,
-      "actor": "Artur",
-      "target": "101",
-      "item": "Lightning",
-      "itemIndex": 0,
-      "position": [
-        3,
-        14
-      ],
-      "heuristic": 17.475
-    },
-    {
-      "type": "attack",
-      "turn": 3,
-      "actor": "Ross",
-      "target": "117",
-      "item": "Hatchet",
-      "itemIndex": 0,
-      "position": [
-        14,
-        18
-      ],
-      "heuristic": 30.790000000000003
-    },
-    {
-      "type": "attack",
-      "turn": 3,
       "actor": "Neimi",
       "target": "117",
       "item": "Iron_Bow",
       "itemIndex": 0,
       "position": [
         12,
-        18
+        20
       ],
-      "heuristic": 38.260000000000005
+      "heuristic": 26.2
     },
     {
-      "type": "move",
+      "type": "attack",
       "turn": 3,
-      "actor": "Gilliam",
-      "position": [
-        10,
-        14
-      ],
-      "heuristic": 51.095
-    },
-    {
-      "type": "move",
-      "turn": 3,
-      "actor": "Natasha",
-      "position": [
-        8,
-        11
-      ],
-      "heuristic": 27.32
-    },
-    {
-      "type": "wait",
-      "turn": 3,
-      "actor": "Moulder",
-      "position": [
-        12,
-        19
-      ],
-      "heuristic": -1
-    },
-    {
-      "type": "talk",
-      "turn": 4,
-      "actor": "Natasha",
-      "target": "Joshua",
-      "position": [
-        9,
-        7
-      ],
-      "heuristic": 10060
-    },
-    {
-      "type": "attack",
-      "turn": 4,
-      "actor": "Eirika",
-      "target": "106",
-      "item": "Rapier",
-      "itemIndex": 0,
-      "position": [
-        10,
-        10
-      ],
-      "heuristic": 84.98
-    },
-    {
-      "type": "attack",
-      "turn": 4,
-      "actor": "Seth",
-      "target": "118",
-      "item": "Silver_Lance",
-      "itemIndex": 1,
-      "position": [
-        13,
-        6
-      ],
-      "heuristic": 290.8066666666666
-    },
-    {
-      "type": "attack",
-      "turn": 4,
-      "actor": "Ross",
-      "target": "117",
-      "item": "Hatchet",
-      "itemIndex": 0,
-      "position": [
-        13,
-        16
-      ],
-      "heuristic": 153.09
-    },
-    {
-      "type": "attack",
-      "turn": 4,
       "actor": "Artur",
-      "target": "102",
+      "target": "117",
       "item": "Lightning",
       "itemIndex": 0,
       "position": [
-        3,
-        14
-      ],
-      "heuristic": 95.55263157894737
-    },
-    {
-      "type": "heal",
-      "turn": 4,
-      "actor": "Moulder",
-      "target": "Neimi",
-      "item": "Heal",
-      "itemIndex": 0,
-      "position": [
-        13,
+        12,
         18
       ],
-      "heuristic": 72
-    },
-    {
-      "type": "move",
-      "turn": 4,
-      "actor": "Gilliam",
-      "position": [
-        11,
-        11
-      ],
-      "heuristic": 54
+      "heuristic": -5.179999999999993
     },
     {
       "type": "heal",
-      "turn": 4,
+      "turn": 3,
+      "actor": "Moulder",
+      "target": "Moulder",
+      "item": "Vulnerary",
+      "itemIndex": 1,
+      "position": [
+        8,
+        20
+      ],
+      "heuristic": 76
+    },
+    {
+      "type": "heal",
+      "turn": 3,
       "actor": "Natasha",
       "target": "Natasha",
       "item": "Vulnerary",
       "itemIndex": 1,
       "position": [
-        9,
-        7
+        5,
+        12
       ],
-      "heuristic": 36
+      "heuristic": 72.03999999999999
+    },
+    {
+      "type": "move",
+      "turn": 3,
+      "actor": "Ross",
+      "position": [
+        6,
+        15
+      ],
+      "heuristic": 51.95
+    },
+    {
+      "type": "move",
+      "turn": 3,
+      "actor": "Gilliam",
+      "position": [
+        5,
+        15
+      ],
+      "heuristic": 51.55
+    },
+    {
+      "type": "move",
+      "turn": 3,
+      "actor": "Eirika",
+      "position": [
+        6,
+        16
+      ],
+      "heuristic": 22
+    },
+    {
+      "type": "attack",
+      "turn": 4,
+      "actor": "Seth",
+      "target": "111",
+      "item": "Steel_Sword",
+      "itemIndex": 0,
+      "position": [
+        6,
+        11
+      ],
+      "heuristic": 308.70500000000004
+    },
+    {
+      "type": "attack",
+      "turn": 4,
+      "actor": "Ross",
+      "target": "101",
+      "item": "Hatchet",
+      "itemIndex": 0,
+      "position": [
+        6,
+        15
+      ],
+      "heuristic": 181
+    },
+    {
+      "type": "attack",
+      "turn": 4,
+      "actor": "Neimi",
+      "target": "117",
+      "item": "Iron_Bow",
+      "itemIndex": 0,
+      "position": [
+        11,
+        20
+      ],
+      "heuristic": 80.32000000000001
+    },
+    {
+      "type": "attack",
+      "turn": 4,
+      "actor": "Artur",
+      "target": "116",
+      "item": "Lightning",
+      "itemIndex": 0,
+      "position": [
+        13,
+        18
+      ],
+      "heuristic": -2.7899999999999956
+    },
+    {
+      "type": "heal",
+      "turn": 4,
+      "actor": "Moulder",
+      "target": "Moulder",
+      "item": "Vulnerary",
+      "itemIndex": 1,
+      "position": [
+        5,
+        18
+      ],
+      "heuristic": 72
+    },
+    {
+      "type": "heal",
+      "turn": 4,
+      "actor": "Natasha",
+      "target": "Seth",
+      "item": "Heal",
+      "itemIndex": 0,
+      "position": [
+        6,
+        10
+      ],
+      "heuristic": 32
+    },
+    {
+      "type": "heal",
+      "turn": 4,
+      "actor": "Gilliam",
+      "target": "Gilliam",
+      "item": "Vulnerary",
+      "itemIndex": 1,
+      "position": [
+        5,
+        15
+      ],
+      "heuristic": 4
     },
     {
       "type": "move",
       "turn": 4,
-      "actor": "Neimi",
+      "actor": "Eirika",
       "position": [
-        14,
+        5,
         16
       ],
-      "heuristic": 25
+      "heuristic": 22
     },
     {
-      "type": "attack",
+      "type": "talk",
       "turn": 5,
-      "actor": "Joshua",
-      "target": "103",
-      "item": "Killing_Edge",
-      "itemIndex": 0,
+      "actor": "Natasha",
+      "target": "Joshua",
       "position": [
-        10,
-        3
+        5,
+        11
       ],
-      "heuristic": 211.82500000000002
-    },
-    {
-      "type": "attack",
-      "turn": 5,
-      "actor": "Gilliam",
-      "target": "107",
-      "item": "Iron_Lance",
-      "itemIndex": 0,
-      "position": [
-        10,
-        8
-      ],
-      "heuristic": 167.95
+      "heuristic": 10000
     },
     {
       "type": "attack",
       "turn": 5,
       "actor": "Seth",
+      "target": "106",
+      "item": "Silver_Lance",
+      "itemIndex": 1,
+      "position": [
+        8,
+        10
+      ],
+      "heuristic": 278.17999999999995
+    },
+    {
+      "type": "attack",
+      "turn": 5,
+      "actor": "Artur",
+      "target": "116",
+      "item": "Lightning",
+      "itemIndex": 0,
+      "position": [
+        12,
+        18
+      ],
+      "heuristic": 21.210000000000004
+    },
+    {
+      "type": "attack",
+      "turn": 5,
+      "actor": "Neimi",
+      "target": "116",
+      "item": "Iron_Bow",
+      "itemIndex": 0,
+      "position": [
+        10,
+        20
+      ],
+      "heuristic": 107.61684210526316
+    },
+    {
+      "type": "heal",
+      "turn": 5,
+      "actor": "Natasha",
+      "target": "Natasha",
+      "item": "Vulnerary",
+      "itemIndex": 1,
+      "position": [
+        5,
+        11
+      ],
+      "heuristic": 12
+    },
+    {
+      "type": "move",
+      "turn": 5,
+      "actor": "Moulder",
+      "position": [
+        4,
+        15
+      ],
+      "heuristic": 18
+    },
+    {
+      "type": "move",
+      "turn": 5,
+      "actor": "Eirika",
+      "position": [
+        5,
+        16
+      ],
+      "heuristic": 9
+    },
+    {
+      "type": "move",
+      "turn": 5,
+      "actor": "Gilliam",
+      "position": [
+        5,
+        15
+      ],
+      "heuristic": 5
+    },
+    {
+      "type": "move",
+      "turn": 5,
+      "actor": "Ross",
+      "position": [
+        6,
+        15
+      ],
+      "heuristic": -1
+    },
+    {
+      "type": "attack",
+      "turn": 6,
+      "actor": "Seth",
+      "target": "103",
+      "item": "Steel_Sword",
+      "itemIndex": 0,
+      "position": [
+        9,
+        4
+      ],
+      "heuristic": 324.27878787878785
+    },
+    {
+      "type": "attack",
+      "turn": 6,
+      "actor": "Eirika",
+      "target": "102",
+      "item": "Rapier",
+      "itemIndex": 0,
+      "position": [
+        2,
+        15
+      ],
+      "heuristic": 35.769999999999996
+    },
+    {
+      "type": "attack",
+      "turn": 6,
+      "actor": "Ross",
+      "target": "102",
+      "item": "Hatchet",
+      "itemIndex": 0,
+      "position": [
+        3,
+        15
+      ],
+      "heuristic": 65.64
+    },
+    {
+      "type": "heal",
+      "turn": 6,
+      "actor": "Neimi",
+      "target": "Neimi",
+      "item": "Vulnerary",
+      "itemIndex": 1,
+      "position": [
+        6,
+        19
+      ],
+      "heuristic": 100
+    },
+    {
+      "type": "move",
+      "turn": 6,
+      "actor": "Joshua",
+      "position": [
+        5,
+        7
+      ],
+      "heuristic": 62
+    },
+    {
+      "type": "move",
+      "turn": 6,
+      "actor": "Natasha",
+      "position": [
+        5,
+        8
+      ],
+      "heuristic": 38
+    },
+    {
+      "type": "move",
+      "turn": 6,
+      "actor": "Moulder",
+      "position": [
+        3,
+        11
+      ],
+      "heuristic": 30
+    },
+    {
+      "type": "move",
+      "turn": 6,
+      "actor": "Gilliam",
+      "position": [
+        3,
+        13
+      ],
+      "heuristic": 6
+    },
+    {
+      "type": "move",
+      "turn": 6,
+      "actor": "Artur",
+      "position": [
+        10,
+        20
+      ],
+      "heuristic": 2
+    },
+    {
+      "type": "attack",
+      "turn": 7,
+      "actor": "Seth",
+      "target": "109",
+      "item": "Silver_Lance",
+      "itemIndex": 1,
+      "position": [
+        9,
+        4
+      ],
+      "heuristic": 307.8881818181818
+    },
+    {
+      "type": "heal",
+      "turn": 7,
+      "actor": "Neimi",
+      "target": "Neimi",
+      "item": "Vulnerary",
+      "itemIndex": 1,
+      "position": [
+        5,
+        15
+      ],
+      "heuristic": 68
+    },
+    {
+      "type": "move",
+      "turn": 7,
+      "actor": "Eirika",
+      "position": [
+        4,
+        12
+      ],
+      "heuristic": 70
+    },
+    {
+      "type": "move",
+      "turn": 7,
+      "actor": "Artur",
+      "position": [
+        6,
+        19
+      ],
+      "heuristic": 62
+    },
+    {
+      "type": "move",
+      "turn": 7,
+      "actor": "Ross",
+      "position": [
+        3,
+        10
+      ],
+      "heuristic": 60
+    },
+    {
+      "type": "move",
+      "turn": 7,
+      "actor": "Gilliam",
+      "position": [
+        5,
+        11
+      ],
+      "heuristic": 54
+    },
+    {
+      "type": "move",
+      "turn": 7,
+      "actor": "Moulder",
+      "position": [
+        3,
+        6
+      ],
+      "heuristic": 54
+    },
+    {
+      "type": "move",
+      "turn": 7,
+      "actor": "Natasha",
+      "position": [
+        5,
+        5
+      ],
+      "heuristic": 38
+    },
+    {
+      "type": "move",
+      "turn": 7,
+      "actor": "Joshua",
+      "position": [
+        5,
+        6
+      ],
+      "heuristic": 14
+    },
+    {
+      "type": "visit",
+      "turn": 8,
+      "actor": "Seth",
+      "region": "Village4",
+      "position": [
+        5,
+        1
+      ],
+      "heuristic": 10084
+    },
+    {
+      "type": "move",
+      "turn": 8,
+      "actor": "Eirika",
+      "position": [
+        4,
+        7
+      ],
+      "heuristic": 70
+    },
+    {
+      "type": "move",
+      "turn": 8,
+      "actor": "Artur",
+      "position": [
+        8,
+        16
+      ],
+      "heuristic": 62
+    },
+    {
+      "type": "move",
+      "turn": 8,
+      "actor": "Neimi",
+      "position": [
+        10,
+        15
+      ],
+      "heuristic": 61
+    },
+    {
+      "type": "move",
+      "turn": 8,
+      "actor": "Ross",
+      "position": [
+        5,
+        7
+      ],
+      "heuristic": 60
+    },
+    {
+      "type": "move",
+      "turn": 8,
+      "actor": "Gilliam",
+      "position": [
+        8,
+        10
+      ],
+      "heuristic": 54
+    },
+    {
+      "type": "move",
+      "turn": 8,
+      "actor": "Joshua",
+      "position": [
+        9,
+        7
+      ],
+      "heuristic": 38
+    },
+    {
+      "type": "move",
+      "turn": 8,
+      "actor": "Moulder",
+      "position": [
+        7,
+        7
+      ],
+      "heuristic": 30
+    },
+    {
+      "type": "move",
+      "turn": 8,
+      "actor": "Natasha",
+      "position": [
+        5,
+        5
+      ],
+      "heuristic": 1
+    },
+    {
+      "type": "attack",
+      "turn": 9,
+      "actor": "Seth",
+      "target": "120",
+      "item": "Steel_Sword",
+      "itemIndex": 0,
+      "position": [
+        9,
+        2
+      ],
+      "heuristic": 302.3185294117647
+    },
+    {
+      "type": "attack",
+      "turn": 9,
+      "actor": "Joshua",
+      "target": "121",
+      "item": "Killing_Edge",
+      "itemIndex": 0,
+      "position": [
+        12,
+        5
+      ],
+      "heuristic": 238.265
+    },
+    {
+      "type": "move",
+      "turn": 9,
+      "actor": "Eirika",
+      "position": [
+        9,
+        7
+      ],
+      "heuristic": 70
+    },
+    {
+      "type": "move",
+      "turn": 9,
+      "actor": "Artur",
+      "position": [
+        9,
+        12
+      ],
+      "heuristic": 62
+    },
+    {
+      "type": "move",
+      "turn": 9,
+      "actor": "Neimi",
+      "position": [
+        10,
+        10
+      ],
+      "heuristic": 61
+    },
+    {
+      "type": "move",
+      "turn": 9,
+      "actor": "Ross",
+      "position": [
+        10,
+        7
+      ],
+      "heuristic": 60
+    },
+    {
+      "type": "move",
+      "turn": 9,
+      "actor": "Gilliam",
+      "position": [
+        10,
+        8
+      ],
+      "heuristic": 54
+    },
+    {
+      "type": "move",
+      "turn": 9,
+      "actor": "Moulder",
+      "position": [
+        12,
+        7
+      ],
+      "heuristic": 54
+    },
+    {
+      "type": "move",
+      "turn": 9,
+      "actor": "Natasha",
+      "position": [
+        7,
+        7
+      ],
+      "heuristic": 2
+    },
+    {
+      "type": "attack",
+      "turn": 10,
+      "actor": "Seth",
       "target": "Saar",
       "item": "Silver_Lance",
       "itemIndex": 1,
       "position": [
-        13,
-        0
+        12,
+        1
       ],
-      "heuristic": 411.41666666666663
+      "heuristic": 471.87857142857143
     }
   ],
-  "planner": {
-    "beamWidth": 96,
-    "branchLimit": 32,
-    "maxNodes": 100000,
-    "damageFrontierRatio": 0.7,
-    "nodesGenerated": 100000,
-    "nodesAccepted": 91468,
-    "cacheHits": 8524,
-    "frontierPeak": 96,
-    "deepestTurn": 5,
-    "incumbentSource": "beam",
-    "elapsedMs": 78439.231
-  },
   "interactions": {
     "visitedRegions": [
       "Village1",
@@ -539,7 +969,7 @@
     "version": 1,
     "scenarioSha256": "0d6554c9efcfc0d5fcadbb8b7a35aa2baf8de6c6501b698536927f7f3bca29cc",
     "projectDataSha256": "a22fb5b668c7c9219bc346ea8d79b34f37f100ab09ba13245fcb0860e0aaf8fc",
-    "engineSourceSha256": "3d44921bd606ab01a25723f06fd227cfdd020de401273fffe2f83db0876e2780",
-    "instanceSha256": "a297dcf44c6a7f6f21d136cea3f2bec2c2720e14940c5f92174fa07557b49082"
+    "engineSourceSha256": "d5feb2d95677c32e51ebf82c32e40e1a2ee4d7d306a79d3d8e76ffdec16a465c",
+    "instanceSha256": "307e28d23d23f10341fd7bcd05af8112a13505ad66e21839d554239a436b10ca"
   }
 }

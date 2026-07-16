@@ -121,6 +121,26 @@ test('planner interactions consume unlock uses, grant rewards, and recruit direc
   visitSimulator.applyPlayerAction(visit);
   assert.ok(visitSimulator.getResult().finalUnits.find((unit) => unit.nid === 'Eirika')
     ?.items.some((item) => item.nid === 'Dragonshield'));
+  assert.ok(visitSimulator.createCheckpoint(false).activeRegions.includes('DestroyVillage1'));
+
+  const chapter2VisitSimulator = new TacticalSimulator(db, {
+    name: 'Chapter 2 scripted paired-region fixture',
+    levelNid: '2',
+    seed: 2,
+    maxTurns: 1,
+    objective: 'rout',
+    eventAdapter: 'standard',
+    team: {
+      Eirika: { level: 4, items: ['Rapier'], position: [4, 2] },
+    },
+  });
+  chapter2VisitSimulator.beginPlayerTurn();
+  const chapter2Visit = chapter2VisitSimulator.enumerateLegalActions().find(
+    (action) => action.type === 'visit' && action.actor === 'Eirika' && action.region === 'Village1',
+  );
+  assert.ok(chapter2Visit);
+  chapter2VisitSimulator.applyPlayerAction(chapter2Visit);
+  assert.ok(!chapter2VisitSimulator.createCheckpoint(false).activeRegions.includes('DestroyVillage1'));
 
   const talkSimulator = new TacticalSimulator(db, chapter5Base);
   talkSimulator.beginPlayerTurn();

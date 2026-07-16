@@ -451,8 +451,10 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
   migrating a route to a current benchmark fingerprint.
 - **Planner state**: Versioned checkpoints and independent clones preserve RNG,
   turn/event lifecycle, metrics, unit flags/stats/positions, inventories/uses,
-  explicit equipment, active regions/layers/interactions, off-map level units,
-  and replay state. Legal player actions are
+  explicit equipment, exact skills and mutable skill data, active
+  regions/layers/interactions, off-map level units, and replay state. Live
+  checkpoint restoration can materialize carried roster units absent from the
+  chapter prefab. Legal player actions are
   enumerable and validated one at a time, with deterministic enemy/other phase
   stepping and cache-stable keys. Search supports zero-death pruning and exact
   action-prefix continuation. Beam nodes store checkpoints and reuse a simulator
@@ -465,10 +467,10 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
   continuation, and prefixes reject missing or mismatched fingerprints.
 - **Parity audit**: Solver and live browser harness expose a shared normalized
   action-boundary snapshot plus field-level diffs for RNG, phases, units,
-  inventories/equipment, regions, and layers. The saved Chapter 4 route is
-  replayed through live attacks, heals, moves, waits, visits, talks, doors,
-  chests, and phase transitions. Combat durability and combat EXP use shared
-  semantics in the solver and both visual combat paths.
+  inventories/equipment, regions, and layers. The saved Chapter 4 and Chapter 5
+  routes are replayed through live attacks, heals, moves, waits, visits, talks,
+  doors, chests, recruitment, and phase transitions. Combat durability and
+  combat EXP use shared semantics in the solver and both visual combat paths.
 - **Replay**: Every action records a state snapshot for JSON verification and an
   interactive grid animation
 - **Chapter 3 result**: Canonical fixed seed 3 route clears in 6 turns/73
@@ -481,8 +483,10 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
 - **Chapter 5 result**: Canonical fixed seed 5 explicit plan recruits Joshua,
   visits Village 2, and defeats Saar in 4 turns/66 actions with zero deaths and
   71 damage under corrected equipment/EXP/AI semantics. A 22,383-node <=70
-  challenge found no improvement. The all-four-villages stress fixture has a separate verified
-  5-turn/1-death/66-damage incumbent.
+  challenge found no improvement. The all-four-villages stress fixture has a
+  separate verified 10-turn/1-death/66-damage incumbent under current semantics;
+  its prior 5-turn artifact was rejected when exact replay found Vanessa dead
+  before a later saved action.
 
 ---
 

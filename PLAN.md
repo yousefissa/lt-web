@@ -111,6 +111,30 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 ### Recent Changes
 
+- **Chapter 5 live differential matrix + exact checkpoint restoration:**
+  - Generalized the saved-route Playwright differential into a Chapter 4/5
+    scenario matrix. The canonical fixed-seed Chapter 5 route now matches the
+    live engine after every player action and enemy/other phase boundary,
+    including Village 2 and Natasha-to-Joshua recruitment.
+  - Made tactical checkpoints self-contained across chapter boundaries: live
+    restoration now materializes missing carried roster units, and simulator
+    clones/checkpoints preserve exact skill NIDs plus mutable skill data in
+    future-state/transposition identity.
+  - Matched Python LT interaction semantics: Talk applies `HasTraded` without
+    prematurely finishing the unit, and one-shot Visit/Destructible regions
+    consume only the selected region unless an event script explicitly removes
+    its sibling. Chapter 2's scripted pairing and Chapter 5's independent
+    regions are both covered.
+  - `GameState.loadLevel()` now clones mutable level runtime state from the
+    database prefab, matching Python's `LevelObject.from_prefab`; region/layer
+    mutations no longer corrupt same-chapter reloads.
+  - Rejected the stale Chapter 5 all-content route when replay proved Vanessa
+    died before action 19. A fresh 50,000-node fixed-seed beam run established a
+    valid all-four-villages + Joshua incumbent at 10 turns/155 actions,
+    1 death/66 damage. This is best-found and remains a priority to improve.
+  - Verification: production build, 22/22 solver tests, 54/54 browser harness
+    tests, and the 2/2 Chapter 4/5 action-boundary parity matrix pass.
+
 - **Fixed-seed live differential planner + combat/event parity correction:**
   - Added explicit LT-style equipped-weapon state without inventory reordering,
     persisted it through saves and cloneable solver checkpoints, and shared
@@ -307,10 +331,11 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
     - Ch.4 outro branch matrix across Artur/Lute permutations (Artur-only, Lute-only, both alive, both dead)
     - Ch.5 `Village1/3/4` visit reward matrix with one-time reward + region-consumption checks
     - Ch.5 arena interaction flow (menu option, event progression, return-to-map control)
-    - Ch.5 visit-vs-destroy ordering semantics (one-time region consumption in both directions)
+    - Ch.5 script-driven visit-vs-destroy ordering semantics in both directions
     - Ch.5 turn-event idempotency for `Turn2/4/8` over repeated long-window retriggers
-  - Updated region cleanup semantics in `src/engine/states/game-states.ts` so triggering one
-    side of village Visit/Destructible siblings consumes both matching one-time regions on the same tile.
+  - Updated region cleanup semantics in `src/engine/states/game-states.ts` so
+    each one-shot region consumes itself; event scripts control whether a
+    co-located Visit/Destructible sibling is also removed.
   - Added screenshots:
     `55-ch4-outro-branch-matrix.png`,
     `56-ch5-village134-visit-matrix.png`,
@@ -323,7 +348,7 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 - [x] Drive a complete saved planner route through the live browser state
   machine and compare the parity snapshot after every action/phase boundary.
-- [ ] Extend the saved-route live differential audit to Chapter 5's visit and
+- [x] Extend the saved-route live differential audit to Chapter 5's visit and
   Natasha-to-Joshua recruitment path, then make it a reusable scenario matrix.
 - [ ] Add an exhaustive or admissibly bounded fixed-seed proof attempt for the
   Chapter 4 zero/one-damage frontier; the current 2-damage result is not proven.
@@ -343,7 +368,7 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 - [x] **Chapter 5 arena interaction flow coverage.** Validate arena menu availability,
   interaction state flow, and safe return to map control without soft-lock.
 - [x] **Chapter 5 village destroy-vs-visit ordering checks.** Add race-condition tests for
-  enemy destructible events vs player visits to ensure one-time semantics and layer toggles are correct.
+  enemy destructible events vs player visits to ensure script-driven region consumption and layer toggles are correct.
 - [x] **Chapter 5 turn-event idempotency sweep.** Re-trigger `Turn2/4/8` conditions across long
   frame windows and confirm no duplicate group spawn or stale event-state stacking.
 - [x] **Enemy AI region interaction regression.** Add harness coverage for AI-driven

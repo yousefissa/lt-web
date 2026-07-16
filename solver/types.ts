@@ -188,6 +188,11 @@ export interface TacticalItemCheckpoint {
   droppable: boolean;
 }
 
+export interface TacticalSkillCheckpoint {
+  nid: string;
+  data: [string, unknown][];
+}
+
 export interface TacticalUnitCheckpoint {
   nid: string;
   name: string;
@@ -207,6 +212,7 @@ export interface TacticalUnitCheckpoint {
   ai: string;
   aiGroup: string;
   items: TacticalItemCheckpoint[];
+  skills: TacticalSkillCheckpoint[];
   /** Inventory slot of the explicitly equipped weapon, if any. */
   equippedItemIndex: number | null;
   hasAttacked: boolean;
@@ -223,7 +229,7 @@ export interface TacticalUnitCheckpoint {
 
 /** Serializable simulator state. Immutable database/map data is intentionally excluded. */
 export interface TacticalCheckpoint {
-  version: 1;
+  version: 2;
   currentTurn: number;
   currentPhase: SolverPhase;
   playerPhasePrepared: boolean;

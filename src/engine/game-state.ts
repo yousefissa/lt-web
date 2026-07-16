@@ -399,7 +399,10 @@ export class GameState {
     if (!levelPrefab) {
       throw new Error(`GameState.loadLevel: unknown level "${levelNid}"`);
     }
-    this.currentLevel = levelPrefab;
+    // Python LT constructs a mutable LevelObject from the immutable database
+    // prefab. Keep runtime region/event mutations out of the database so a
+    // same-chapter reload starts from pristine level data.
+    this.currentLevel = structuredClone(levelPrefab);
 
     // Reset per-level state
     this.units.clear();

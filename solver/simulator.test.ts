@@ -114,6 +114,7 @@ test('planner checkpoints clone exact RNG, unit, inventory, and turn state', {
   assert.ok(actions.some((action) => action.type === 'move' || action.type === 'attack'));
 
   const clone = simulator.clone(false);
+  assert.deepEqual(clone.createCheckpoint(false), simulator.createCheckpoint(false));
   assert.equal(clone.getTranspositionKey(), simulator.getTranspositionKey());
   assert.equal(clone.getFutureStateKey(), simulator.getFutureStateKey());
   const chosen = actions.find((action) => action.type === 'attack') ?? actions[0];

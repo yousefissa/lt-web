@@ -412,7 +412,6 @@ export class TacticalSimulator {
           continue;
         }
         if (rule.type === 'destructible' || !rule.regionNid || !this.activeRegions.has(rule.regionNid)) continue;
-        if (rule.type === 'visit' && this.destroyedRegions.has(rule.regionNid)) continue;
         const region = this.level.regions.find((candidate) => candidate.nid === rule.regionNid);
         if (!region) continue;
         for (const position of validMoves) {
@@ -709,7 +708,7 @@ export class TacticalSimulator {
 
   createCheckpoint(includeReplay = true): TacticalCheckpoint {
     return {
-      version: 1,
+      version: 2,
       currentTurn: this.currentTurn,
       currentPhase: this.currentPhase,
       playerPhasePrepared: this.playerPhasePrepared,
@@ -733,7 +732,7 @@ export class TacticalSimulator {
   }
 
   restoreCheckpoint(checkpoint: TacticalCheckpoint): void {
-    if (checkpoint.version !== 1) throw new Error(`Unsupported checkpoint version: ${checkpoint.version}`);
+    if (checkpoint.version !== 2) throw new Error(`Unsupported checkpoint version: ${checkpoint.version}`);
     for (const unit of this.units.values()) this.board.removeUnit(unit);
 
     const checkpointNids = new Set(checkpoint.units.map((unit) => unit.nid));
@@ -1936,6 +1935,10 @@ export class TacticalSimulator {
         uses: item.uses,
         droppable: item.droppable,
       })),
+      skills: unit.skills.map((skill) => ({
+        nid: skill.nid,
+        data: structuredClone(Array.from(skill.data.entries())),
+      })),
       equippedItemIndex: unit.equippedWeapon ? unit.items.indexOf(unit.equippedWeapon) : null,
       hasAttacked: unit.hasAttacked,
       hasMoved: unit.hasMoved,
@@ -1975,6 +1978,13 @@ export class TacticalSimulator {
       item.uses = savedItem.uses;
       item.droppable = savedItem.droppable;
       return item;
+    });
+    unit.skills = saved.skills.map((savedSkill) => {
+      const prefab = this.db.skills.get(savedSkill.nid);
+      if (!prefab) throw new Error(`Cannot restore unknown skill: ${savedSkill.nid}`);
+      const skill = new SkillObject(prefab);
+      skill.data = new Map(structuredClone(savedSkill.data));
+      return skill;
     });
     unit.equippedWeapon = saved.equippedItemIndex === null
       ? null

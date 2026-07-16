@@ -19,6 +19,7 @@ import type { Surface } from './engine/surface';
 import type { InputEvent, GameButton } from './engine/input';
 import { FRAMETIME, updateAnimationCounters } from './engine/constants';
 import { ItemObject } from './objects/item';
+import { SkillObject } from './objects/skill';
 import { clearRandomSeed, getRandomState, setRandomSeed } from './engine/random';
 import type { EngineParityState } from './engine/parity';
 
@@ -26,6 +27,11 @@ export interface HarnessCheckpointItem {
   nid: string;
   uses: number;
   droppable: boolean;
+}
+
+export interface HarnessCheckpointSkill {
+  nid: string;
+  data: [string, unknown][];
 }
 
 export interface HarnessCheckpointUnit {
@@ -47,6 +53,7 @@ export interface HarnessCheckpointUnit {
   ai: string;
   aiGroup: string;
   items: HarnessCheckpointItem[];
+  skills: HarnessCheckpointSkill[];
   equippedItemIndex: number | null;
   hasAttacked: boolean;
   hasMoved: boolean;
@@ -59,7 +66,7 @@ export interface HarnessCheckpointUnit {
 }
 
 export interface HarnessTacticalCheckpoint {
-  version: 1;
+  version: 2;
   currentTurn: number;
   currentPhase: string;
   rngState: number;
@@ -493,7 +500,7 @@ export function installHarness(
     },
 
     restoreTacticalCheckpoint(checkpoint: HarnessTacticalCheckpoint): void {
-      if (checkpoint.version !== 1) throw new Error(`Unsupported checkpoint version: ${checkpoint.version}`);
+      if (checkpoint.version !== 2) throw new Error(`Unsupported checkpoint version: ${checkpoint.version}`);
       if (!game.board || !game.currentLevel || !game.tilemap || !game.phase) {
         throw new Error('A live level must be loaded before restoring a tactical checkpoint');
       }
@@ -506,8 +513,19 @@ export function installHarness(
       game.items.clear();
 
       for (const saved of checkpoint.units) {
-        const unit = game.units.get(saved.nid);
-        if (!unit) throw new Error(`Checkpoint unit ${saved.nid} is not present in the loaded level`);
+        let unit = game.units.get(saved.nid);
+        if (!unit) {
+          const levelUnit = game.currentLevel.units.find((candidate) => candidate.nid === saved.nid);
+          if (levelUnit?.generic) {
+            game.spawnGenericUnit({ ...levelUnit, team: saved.team, starting_position: null });
+            unit = game.units.get(saved.nid);
+          }
+        }
+        if (!unit) {
+          const prefab = game.db.units.get(saved.nid);
+          if (prefab) unit = game.spawnUnit(prefab, saved.team, null, saved.ai);
+        }
+        if (!unit) throw new Error(`Cannot materialize checkpoint unit: ${saved.nid}`);
         unit.name = saved.name;
         unit.team = saved.team;
         unit.klass = saved.klass;
@@ -526,15 +544,21 @@ export function installHarness(
         unit.tags = [...saved.tags];
         unit.ai = saved.ai;
         unit.aiGroup = saved.aiGroup;
-        unit.items = saved.items.map((savedItem, index) => {
+        unit.items = saved.items.map((savedItem) => {
           const prefab = game.db.items.get(savedItem.nid);
           if (!prefab) throw new Error(`Unknown checkpoint item: ${savedItem.nid}`);
           const item = new ItemObject(prefab);
           item.owner = unit;
           item.uses = savedItem.uses;
           item.droppable = savedItem.droppable;
-          game.items.set(`${unit.nid}_${item.nid}_${index}`, item);
           return item;
+        });
+        unit.skills = saved.skills.map((savedSkill) => {
+          const prefab = game.db.skills.get(savedSkill.nid);
+          if (!prefab) throw new Error(`Unknown checkpoint skill: ${savedSkill.nid}`);
+          const skill = new SkillObject(prefab);
+          skill.data = new Map(structuredClone(savedSkill.data));
+          return skill;
         });
         unit.equippedWeapon = saved.equippedItemIndex === null
           ? null
@@ -549,6 +573,13 @@ export function installHarness(
         unit.statusEffects = structuredClone(saved.statusEffects) as typeof unit.statusEffects;
         unit.rescuing = null;
         unit.rescuedBy = null;
+      }
+
+      game.items.clear();
+      for (const unit of game.units.values()) {
+        unit.items.forEach((item, index) => {
+          game.items.set(`${unit.nid}_${item.nid}_${index}`, item);
+        });
       }
 
       for (const saved of checkpoint.units) {
@@ -676,15 +707,8 @@ export function installHarness(
         }, context) ?? false;
         if (!didTrigger) throw new Error(`No live event accepted ${action.type} at ${region.nid}`);
         if (region.only_once) {
-          const siblingNid = region.nid.startsWith('Destroy')
-            ? region.nid.replace(/^Destroy/, '')
-            : `Destroy${region.nid}`;
           currentLevel.regions = currentLevel.regions.filter((candidate) =>
-            candidate.nid !== region.nid
-            && !(candidate.nid === siblingNid
-              && candidate.region_type.toLowerCase() === 'event'
-              && candidate.position[0] === region.position[0]
-              && candidate.position[1] === region.position[1]),
+            candidate.nid !== region.nid,
           );
         }
         unit.finished = true;
@@ -709,7 +733,7 @@ export function installHarness(
           levelVars: game.levelVars,
         }) ?? false;
         if (!didTrigger) throw new Error(`No live talk event accepted ${action.actor} -> ${target.nid}`);
-        unit.finished = true;
+        unit.hasTraded = true;
       } else {
         unit.finished = true;
       }

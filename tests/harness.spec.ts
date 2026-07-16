@@ -2267,7 +2267,7 @@ test.describe('Sacred Stones Chapter Mechanics', () => {
     await saveScreenshot(page, '55-ch4-outro-branch-matrix');
   });
 
-  test('Chapter 5 Village1/3/4 visits grant one-time rewards and consume regions', async ({ page }) => {
+  test('Chapter 5 Village1/3/4 visits grant one-time rewards without consuming independent destroy regions', async ({ page }) => {
     await page.goto('/?harness=true&level=5&bundle=false');
     await waitForHarness(page);
     await stepFrames(page, 10);
@@ -2344,7 +2344,7 @@ test.describe('Sacred Stones Chapter Mechanics', () => {
 
       expect(afterVisit.rewardCount).toBe(beforeCount + 1);
       expect(afterVisit.villagePresent).toBe(false);
-      expect(afterVisit.destroyPresent).toBe(false);
+      expect(afterVisit.destroyPresent).toBe(true);
 
       const retrySetup = await page.evaluate(({ x, y }) => {
         const g = (window as any).__gameRef;
@@ -2463,7 +2463,7 @@ test.describe('Sacred Stones Chapter Mechanics', () => {
     await saveScreenshot(page, '57-ch5-arena-flow-return');
   });
 
-  test('Chapter 5 village destroy-vs-visit ordering stays one-time in both directions', async ({ page }) => {
+  test('Chapter 5 village visit and destroy regions consume independently', async ({ page }) => {
     await page.goto('/?harness=true&level=5&bundle=false');
     await waitForHarness(page);
     await stepFrames(page, 10);
@@ -2491,7 +2491,7 @@ test.describe('Sacred Stones Chapter Mechanics', () => {
       await stepFrames(page, 8);
     };
 
-    // Visit first -> destroy path should no longer be available.
+    // Visit first -> only the Visit region is consumed.
     await page.evaluate(async () => {
       await (window as any).__harness.loadLevelClean('5');
     });
@@ -2531,61 +2531,43 @@ test.describe('Sacred Stones Chapter Mechanics', () => {
         };
       });
 
-    expect(destroyAfterVisit.labels).not.toContain('Destructible');
+    expect(destroyAfterVisit.labels).toContain('Destructible');
     expect(destroyAfterVisit.villagePresent).toBe(false);
-    expect(destroyAfterVisit.destroyPresent).toBe(false);
+    expect(destroyAfterVisit.destroyPresent).toBe(true);
 
-    // Destroy first -> visit path should no longer be available.
+    // Destroy first -> only the Destructible region is consumed.
     await page.evaluate(async () => {
       await (window as any).__harness.loadLevelClean('5');
     });
     await stepFrames(page, 8);
 
-    const forcedDestroy = await page.evaluate(() => {
-      const g = (window as any).__gameRef;
-      const eirika = g?.units?.get?.('Eirika');
-      if (!g || !eirika || !g.board || !g.currentLevel?.regions) return false;
-
-      eirika.team = 'enemy';
-      eirika.finished = false;
-      eirika.hasMoved = false;
-      eirika.hasAttacked = false;
-      eirika.hasTraded = false;
-      g.board.moveUnit(eirika, 12, 10);
-
-      g.currentLevel.regions = (g.currentLevel.regions ?? []).filter((r: any) => r?.nid !== 'DestroyVillage2' && r?.nid !== 'Village2');
-      const ruin = g?.tilemap?.layers?.find?.((l: any) => l?.nid === 'Ruin2');
-      if (ruin) {
-        ruin.visible = true;
-      }
-      return true;
-    });
-    expect(forcedDestroy).toBe(true);
-    await stepFrames(page, 2, 'BACK');
-    await settle(page, 350);
-
-    await openMenuAtVillage('player');
-    const visitAfterDestroy = await page.evaluate(() => {
+    await openMenuAtVillage('enemy');
+    const pickedDestroy = await page.evaluate(() => {
       const g = (window as any).__gameRef;
       const st = g?.state?.getCurrentState?.();
-      const labels = st?.menu?.options?.map((o: any) => o?.label) ?? [];
-      const eirika = g?.units?.get?.('Eirika');
+      if (!st || st.name !== 'menu' || !st.menu) return false;
+      const index = st.menu.options.findIndex((option: any) => option?.label === 'Destructible');
+      if (index < 0) return false;
+      st.menu.selectedIndex = index;
+      return true;
+    });
+    expect(pickedDestroy).toBe(true);
+    await stepFrames(page, 2, 'SELECT');
+    await settle(page, 300);
+
+    const destroyFirst = await page.evaluate(() => {
+      const g = (window as any).__gameRef;
       const regions = g?.currentLevel?.regions ?? [];
-      const rewardCount = (eirika?.items ?? []).filter((it: any) => it?.nid === 'Armorslayer').length;
       return {
-        labels,
-        rewardCount,
         villagePresent: regions.some((r: any) => r?.nid === 'Village2'),
         destroyPresent: regions.some((r: any) => r?.nid === 'DestroyVillage2'),
         ruinVisible: !!g?.tilemap?.layers?.find?.((l: any) => l?.nid === 'Ruin2')?.visible,
       };
     });
 
-    expect(visitAfterDestroy.labels).not.toContain('Visit');
-    expect(visitAfterDestroy.rewardCount).toBe(0);
-    expect(visitAfterDestroy.villagePresent).toBe(false);
-    expect(visitAfterDestroy.destroyPresent).toBe(false);
-    expect(visitAfterDestroy.ruinVisible).toBe(true);
+    expect(destroyFirst.villagePresent).toBe(true);
+    expect(destroyFirst.destroyPresent).toBe(false);
+    expect(destroyFirst.ruinVisible).toBe(true);
 
     await saveScreenshot(page, '58-ch5-village-ordering-visit-vs-destroy');
   });

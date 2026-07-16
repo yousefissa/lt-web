@@ -1642,25 +1642,12 @@ export class MenuState extends State {
             );
           }
         }
-        // Remove only_once regions after triggering. For village tiles that
-        // define both Visit + Destructible sibling regions on the same tile,
-        // consume both siblings so interaction order stays one-time.
+        // Python LT removes only the selected one-shot region. Co-located
+        // regions remain active unless the event script removes them.
         if (didTrigger && region?.only_once && game.currentLevel?.regions) {
-          const siblingNid = regionNid.startsWith('Destroy')
-            ? regionNid.replace(/^Destroy/, '')
-            : `Destroy${regionNid}`;
-          game.currentLevel.regions = game.currentLevel.regions.filter((r: RegionData) => {
-            if (r.nid === regionNid) return false;
-            if (
-              r.nid === siblingNid &&
-              r.region_type.toLowerCase() === 'event' &&
-              r.position[0] === region.position[0] &&
-              r.position[1] === region.position[1]
-            ) {
-              return false;
-            }
-            return true;
-          });
+          game.currentLevel.regions = game.currentLevel.regions.filter(
+            (candidate: RegionData) => candidate.nid !== regionNid,
+          );
         }
         if (unit) unit.finished = true;
         this.menu = null;
@@ -1713,7 +1700,9 @@ export class MenuState extends State {
             ctx,
           );
         }
-        if (unit) unit.finished = true;
+        // Python LT's TalkAbility applies HasTraded, preserving canto/post-action
+        // movement while preventing another full action.
+        if (unit) unit.hasTraded = true;
         this.menu = null;
         if (game.eventManager?.hasActiveEvents()) {
           game.state.change('event');
@@ -4332,23 +4321,12 @@ export class AIState extends MapState {
                 );
               }
 
-              // Remove region if only_once. Also consume Visit/Destructible
-              // sibling on the same tile so AI/player ordering is one-time.
+              // Match Python LT: consume the selected one-shot region only.
+              // Event commands decide whether a co-located sibling is removed.
               if (triggered && region.only_once) {
-                const siblingNid = region.nid.startsWith('Destroy')
-                  ? region.nid.replace(/^Destroy/, '')
-                  : `Destroy${region.nid}`;
                 for (let i = regions.length - 1; i >= 0; i--) {
                   const candidate = regions[i];
-                  const isTriggeredRegion = candidate === region;
-                  const isSiblingRegion =
-                    candidate.nid === siblingNid &&
-                    candidate.region_type === 'event' &&
-                    candidate.position[0] === region.position[0] &&
-                    candidate.position[1] === region.position[1];
-                  if (isTriggeredRegion || isSiblingRegion) {
-                    regions.splice(i, 1);
-                  }
+                  if (candidate === region) regions.splice(i, 1);
                 }
               }
 
