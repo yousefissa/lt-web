@@ -71,7 +71,9 @@ The solver test suite covers seeded RNG, deterministic Chapter 3 and Chapter 4
 clears, exact checkpoint cloning, legal action application, explicit plan replay,
 fixed-seed beam/proof search, dominance caching, benchmark fingerprints,
 engine parity snapshots, combat durability semantics, standard event
-derivation, magic-damage parity, and parallel diagnostic seed-search equivalence through the real database,
+derivation, magic-damage parity, deterministic/tamper-resistant seed manifests,
+global lexicographic scoring, the seed/RNG-free closed-loop policy boundary,
+parallel all-seed evaluation, and parallel diagnostic seed-search equivalence through the real database,
 pathfinding, enemy AI, and combat systems:
 
 ```bash
@@ -114,6 +116,24 @@ Interaction coverage derives Chapter 5 visits/Natasha→Joshua/destructible
 villages and Chapter 3 chest/door rules, including lockpick use and rewards.
 `prove` enumerates the complete supported legal-action tree and says
 `infeasible` only after exhaustion; hitting its node budget is `unknown`.
+
+Global policy verification uses the precommitted manifests and never scans or
+selects seeds:
+
+```bash
+npm run solver -- evaluate-policy --scenario solver/scenarios/chapter-3.json \
+  --seed-manifest solver/seed-manifests/chapter-3/validation.json --workers 4
+npm run solver -- verify-policy --scenario solver/scenarios/chapter-3.json \
+  --test-seeds solver/seed-manifests/chapter-3/test.json \
+  --policy solver/policies/chapter-3-global.json --out solver-output/chapter-3-test.json
+npm run solver -- solve-seeds --scenario solver/scenarios/chapter-3.json \
+  --seed-manifest solver/seed-manifests/chapter-3/test.json --planner beam
+```
+
+Training must load only `train.json` and `validation.json`. Run
+`verify-policy` on `test.json` only after a policy is selected, and do not tune
+again from held-out results. Every evaluation row is required, including failed
+clears, errors, and node-limited proof results.
 
 When the bundled Playwright browser is unavailable, run harness checks against
 an existing Chrome installation with:

@@ -8,8 +8,8 @@ Lex Talionis Python/Pygame engine.
 
 ## Current State
 
-**91 engine source files, ~47,200 lines of TypeScript, plus 13 solver runtime
-files (~4,500 lines) and 7 solver test files.**
+**91 engine source files, ~47,200 lines of TypeScript, plus 16 solver runtime
+files (~5,800 lines) and 8 solver test files.**
 Builds cleanly with zero type errors. All four development phases (Foundation,
 Playable, Visual Polish, Mobile/Distribution) are complete. The engine loads
 `.ltproj` game data over HTTP and runs at 60 fps on Canvas 2D with dynamic
@@ -110,6 +110,30 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
   resolves, matching Python's synchronous behavior and preventing async race frames.
 
 ### Recent Changes
+
+- **Global seed-agnostic solver pipeline + precommitted manifests:**
+  - Added a reusable deterministic closed-loop policy contract. Policy code
+    receives a deeply frozen observation containing current units, map state,
+    interactions, and the complete legal-action set, but no numeric seed, RNG
+    state, simulator reference, or future rolls. Decisions are recomputed after
+    every action and phase so observed hits, misses, crits, deaths, and
+    reinforcements can change the next legal action.
+  - Added immutable versioned train/validation/test manifests derived with
+    SHA-256 from the seed-neutral scenario/project/engine fingerprint, split,
+    and index. Chapter 3, 4, and 5 distributions are checked in before any
+    training (12 train, 6 validation, 6 held-out test seeds per chapter).
+  - Added parallel all-seed evaluation, training-only hill climbing with
+    validation checkpoint selection, held-out verification, and per-seed
+    beam/proof farms that retain every failure instead of selecting favorable
+    seeds. Global scoring is lexicographic over failed clears, death-bearing
+    seeds, total deaths, worst/CVaR-95/mean damage, turns, and actions.
+  - Added full per-seed replay JSON, aggregate HTML reports, and automatic
+    typical/worst-successful/failed representative replay pages. New commands:
+    `create-seed-manifest`, `evaluate-policy`, `train-policy`, `verify-policy`,
+    `solve-seeds`, and `report-policy`.
+  - Added regressions for deterministic derivation/tamper rejection, exact
+    aggregate scoring, the seed/RNG-free policy boundary, closed-loop
+    determinism, and parallel evaluation coverage. Solver tests are 26/26.
 
 - **Chapter 5 live differential matrix + exact checkpoint restoration:**
   - Generalized the saved-route Playwright differential into a Chapter 4/5
@@ -585,6 +609,22 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 ---
 
 ## Remaining Work
+
+### Global Seed-Agnostic Solver (Active)
+
+- [x] Closed-loop observable-state policy API with seed/RNG isolation tests
+- [x] Versioned deterministic Chapter 3/4/5 train, validation, and test manifests
+- [x] Parallel policy evaluator, validation-selected training, held-out verifier,
+  per-seed beam/proof farm, aggregate JSON/HTML, and representative replays
+- [ ] Run and publish Chapter 3 baseline train/validation evaluations
+- [ ] Train Chapter 3 using train seeds only; select on validation; run the
+  held-out test once for both baseline and selected policy
+- [ ] Publish Chapter 3 solve-coverage farm and live-browser parity for the
+  typical, worst successful, and failed representative seeds where present
+- [ ] Run the identical frozen pipeline for Chapters 4 and 5 without
+  chapter-specific simulator logic
+- [ ] Final full solver tests, solver typecheck, production build, and live
+  parity audit; then record benchmark metrics here and in `AGENTS.md`
 
 ### Multi-Project Compatibility (Active)
 

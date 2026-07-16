@@ -43,19 +43,41 @@ npm run solver -- verify --scenario solver/scenarios/chapter-4.json \
   --solution solver/solutions/chapter-4.json
 npm run solver -- verify --scenario solver/scenarios/chapter-5.json \
   --solution solver/solutions/chapter-5.json
+
+# Evaluate one seed-agnostic policy on every immutable manifest seed
+npm run solver -- evaluate-policy --scenario solver/scenarios/chapter-3.json \
+  --seed-manifest solver/seed-manifests/chapter-3/train.json \
+  --workers 4 --out solver-output/chapter-3-baseline-train.json
+
+# Train only on train seeds and select checkpoints only on validation seeds
+npm run solver -- train-policy --scenario solver/scenarios/chapter-3.json \
+  --train-seeds solver/seed-manifests/chapter-3/train.json \
+  --validation-seeds solver/seed-manifests/chapter-3/validation.json \
+  --iterations 100 --workers 4 --out solver-output/chapter-3-policy.json
+
+# Evaluate the selected policy once on the held-out test split
+npm run solver -- verify-policy --scenario solver/scenarios/chapter-3.json \
+  --test-seeds solver/seed-manifests/chapter-3/test.json \
+  --policy solver-output/chapter-3-policy.json \
+  --out solver-output/chapter-3-test.json --html solver-output/chapter-3-test.html
+
+# Run fixed-seed planning for every seed and report solve coverage, not a best seed
+npm run solver -- solve-seeds --scenario solver/scenarios/chapter-3.json \
+  --seed-manifest solver/seed-manifests/chapter-3/test.json \
+  --planner beam --max-nodes 30000 --out solver-output/chapter-3-coverage.json
 ```
 
 The canonical Chapter 3 benchmark fixes seed `3` and clears in 6 turns with
-zero deaths and 19 damage. Create another scenario under `solver/scenarios/`
+zero deaths and zero damage. Create another scenario under `solver/scenarios/`
 to change the party, level, equipment, events, or objective; its `seed` remains
 part of that fixed problem instance.
 
 The canonical Chapter 4 benchmark fixes seed `4`. It uses the reusable standard
-event adapter and routs 22 enemies plus the Snag in 5 turns with zero deaths and
-22 cumulative damage. Its explicit 45-action player plan uses 82 total actions,
-down from the 83-action greedy incumbent. Two 80,000-node fixed-seed beam
-configurations challenged the damage result without finding less than 22; this
-is best-found evidence, not an optimality proof. `--workers` parallelizes policy
+event adapter and routs 22 enemies plus the Snag in 6 turns with zero deaths and
+2 cumulative damage. Its explicit 49-action player plan uses 90 total actions,
+visits both villages, and recruits Lute. A 26,044-node fixed-seed frontier
+challenged the damage result without finding less than 2; this is best-found
+evidence, not an optimality proof. `--workers` parallelizes policy
 candidates without changing the gameplay RNG stream.
 
 Seed-range scanning is deliberately excluded from benchmark results. The CLI
@@ -73,12 +95,20 @@ search into a claim: it reports `found`, exhaustive `infeasible`, or `unknown`
 when the node budget ends.
 
 The canonical Chapter 5 benchmark fixes seed `5`, requires Natasha to recruit
-Joshua, and defeats Saar in 4 turns with zero deaths and 53 cumulative damage;
+Joshua, and defeats Saar in 4 turns with zero deaths and 71 cumulative damage;
 it also visits Village 2. The separate `chapter-5-all-content.json` stress
-scenario requires all four villages plus Joshua and has a verified 5-turn,
+scenario requires all four villages plus Joshua and has a verified 10-turn,
 1-death, 66-damage incumbent. The reusable interaction adapter derives visits,
 talk recruitment, destructible villages, doors, and chests from LT events;
 unlock actions enforce item/class conditions, consume uses, grant event rewards,
 and apply terrain-layer changes.
+
+Global-policy reports are a separate claim from those single-seed routes. The
+checked-in Chapter 3–5 manifests contain 12 train, 6 validation, and 6 held-out
+test seeds derived from the seed-neutral scenario/project/engine fingerprint,
+split name, and index. The optimizer cannot choose, filter, reorder, or read a
+seed. Its frozen observation contains only current tactical state and complete
+legal actions; global reports retain every clear, failure, and error and score
+failed clears, deaths, worst/CVaR-95/mean damage, turns, then actions.
 
 See [TESTING.md](./TESTING.md) for solver and browser regression commands.

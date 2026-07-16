@@ -4,6 +4,16 @@ import path from 'node:path';
 import process from 'node:process';
 import { benchmarkFingerprintsEqual, computeBenchmarkFingerprint } from './benchmark';
 import { beamSearchFixedSeed, replayPlannedSolution } from './beam-search';
+import {
+  computePolicyScenarioFingerprint,
+  createPolicyArtifact,
+  createSeedManifest,
+  evaluatePolicyManifest,
+  solveSeedManifest,
+  trainGlobalPolicy,
+  validateSeedManifest,
+} from './global-policy';
+import { writePolicyReportHtml } from './policy-report';
 import { loadSolverProject } from './project-loader';
 import { proveFixedSeedBound } from './proof-search';
 import { searchPolicyParallel, searchSeedRangeParallel } from './parallel-search';
@@ -11,9 +21,16 @@ import { compareResults, searchPolicy, searchSeedRange } from './search';
 import { DEFAULT_POLICY, TacticalSimulator } from './simulator';
 import type {
   BenchmarkFingerprint,
+  GlobalPolicyArtifact,
   PlannerAction,
+  PolicyEvaluationReport,
+  PolicyTrainingReport,
   PolicyWeights,
   ProofSearchResult,
+  SeedManifest,
+  SeedManifestSplit,
+  SeedSolveMode,
+  SeedSolveReport,
   SolverResult,
   SolverScenario,
 } from './types';
@@ -46,6 +63,15 @@ interface CliOptions {
   solutionPath?: string;
   policyPath?: string;
   prefixPath?: string;
+  seedManifestPath?: string;
+  trainSeedsPath?: string;
+  validationSeedsPath?: string;
+  testSeedsPath?: string;
+  resultsPath?: string;
+  replayDirectory?: string;
+  manifestSplit?: SeedManifestSplit;
+  manifestCount?: number;
+  seedSolveMode: SeedSolveMode;
   json: boolean;
 }
 
@@ -56,12 +82,119 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (options.command === 'report-policy') {
+    if (!options.resultsPath) throw new Error('report-policy requires --results <path>');
+    if (!options.htmlPath) throw new Error('report-policy requires --html <path>');
+    const report = JSON.parse(await readFile(path.resolve(options.resultsPath), 'utf8')) as PolicyEvaluationReport;
+    if (report.kind !== 'global-policy-evaluation' || !Array.isArray(report.runs)) {
+      throw new Error(`${options.resultsPath} is not a global policy evaluation report`);
+    }
+    await writePolicyReportHtml(options.htmlPath, report, options.replayDirectory);
+    console.log(`policy report: ${path.resolve(options.htmlPath)}`);
+    return;
+  }
+
   const scenario = await readScenario(options.scenarioPath);
   if (options.seed !== undefined) scenario.seed = options.seed;
   if (options.maxTurns !== undefined) scenario.maxTurns = options.maxTurns;
   const projectPath = await resolveProjectPath(options.projectPath ?? scenario.project);
   const { db } = await loadSolverProject(projectPath);
   let benchmark = await computeBenchmarkFingerprint(scenario, projectPath);
+
+  if (options.command === 'create-seed-manifest') {
+    if (!options.manifestSplit) throw new Error('create-seed-manifest requires --split train|validation|test');
+    if (!options.manifestCount) throw new Error('create-seed-manifest requires --count <positive integer>');
+    if (!options.outputPath) throw new Error('create-seed-manifest requires --out <path>');
+    const scenarioFingerprint = await computePolicyScenarioFingerprint(scenario, projectPath);
+    const manifest = createSeedManifest(
+      scenario,
+      scenarioFingerprint,
+      options.manifestSplit,
+      options.manifestCount,
+    );
+    await writeJson(options.outputPath, manifest);
+    console.log(formatManifestSummary(manifest));
+    return;
+  }
+
+  if (options.command === 'evaluate-policy' || options.command === 'verify-policy') {
+    const manifestPath = options.command === 'verify-policy'
+      ? options.testSeedsPath
+      : options.seedManifestPath;
+    if (!manifestPath) {
+      throw new Error(`${options.command} requires ${options.command === 'verify-policy' ? '--test-seeds' : '--seed-manifest'} <path>`);
+    }
+    if (options.command === 'verify-policy' && !options.policyPath) {
+      throw new Error('verify-policy requires the selected --policy <path>');
+    }
+    const scenarioFingerprint = await computePolicyScenarioFingerprint(scenario, projectPath);
+    const manifest = await readSeedManifest(manifestPath);
+    if (options.command === 'verify-policy') validateSeedManifest(manifest, scenarioFingerprint, 'test');
+    const policy = await readGlobalPolicyArtifact(options.policyPath, scenarioFingerprint);
+    const report = await evaluatePolicyManifest(db, projectPath, scenario, manifest, policy, {
+      workers: options.workers,
+      scenarioFingerprint,
+    });
+    if (options.outputPath) await writeJson(options.outputPath, report);
+    if (options.htmlPath) await writePolicyReportHtml(options.htmlPath, report, options.replayDirectory);
+    console.log(options.json ? JSON.stringify(report, null, 2) : formatPolicySummary(report));
+    return;
+  }
+
+  if (options.command === 'train-policy') {
+    if (!options.trainSeedsPath || !options.validationSeedsPath) {
+      throw new Error('train-policy requires --train-seeds <path> and --validation-seeds <path>');
+    }
+    if (!options.outputPath) throw new Error('train-policy requires --out <selected-policy-path>');
+    const scenarioFingerprint = await computePolicyScenarioFingerprint(scenario, projectPath);
+    const trainManifest = await readSeedManifest(options.trainSeedsPath);
+    const validationManifest = await readSeedManifest(options.validationSeedsPath);
+    const initial = await readGlobalPolicyArtifact(options.policyPath, scenarioFingerprint);
+    const training = await trainGlobalPolicy(
+      db,
+      projectPath,
+      scenario,
+      trainManifest,
+      validationManifest,
+      initial.weights,
+      { iterations: options.iterations, searchSeed: options.searchSeed, workers: options.workers },
+    );
+    await writeJson(options.outputPath, training.selectedPolicy);
+    if (options.resultsPath) await writeJson(options.resultsPath, training);
+    console.log(formatTrainingSummary(training));
+    return;
+  }
+
+  if (options.command === 'solve-seeds') {
+    if (!options.seedManifestPath) throw new Error('solve-seeds requires --seed-manifest <path>');
+    const scenarioFingerprint = await computePolicyScenarioFingerprint(scenario, projectPath);
+    const manifest = await readSeedManifest(options.seedManifestPath);
+    const policy = await readGlobalPolicyArtifact(options.policyPath, scenarioFingerprint);
+    const report = await solveSeedManifest(db, projectPath, scenario, manifest, policy, {
+      mode: options.seedSolveMode,
+      workers: options.workers,
+      scenarioFingerprint,
+      beam: {
+        beamWidth: options.beamWidth,
+        branchLimit: options.branchLimit,
+        maxNodes: options.maxNodes,
+        damageFrontierRatio: options.damageFrontierRatio,
+        maxPlayerDeaths: options.maxPlayerDeaths,
+        maxDamage: options.maxDamage,
+        maxMovesPerUnit: options.maxMovesPerUnit,
+        maxAttacksPerUnit: options.maxAttacksPerUnit,
+        maxHealsPerUnit: options.maxHealsPerUnit,
+      },
+      proof: {
+        maxNodes: options.maxNodes,
+        maxPlayerDeaths: options.maxPlayerDeaths,
+        maxDamage: options.maxDamage,
+      },
+    });
+    if (options.outputPath) await writeJson(options.outputPath, report);
+    console.log(options.json ? JSON.stringify(report, null, 2) : formatSeedSolveSummary(report));
+    return;
+  }
 
   if (options.command === 'inspect') {
     const simulator = new TacticalSimulator(db, scenario);
@@ -299,6 +432,7 @@ function parseArgs(args: string[]): CliOptions {
     maxMovesPerUnit: 4,
     maxAttacksPerUnit: 4,
     maxHealsPerUnit: 2,
+    seedSolveMode: 'beam',
     json: false,
   };
   for (let index = 0; index < args.length; index++) {
@@ -329,6 +463,15 @@ function parseArgs(args: string[]): CliOptions {
     else if (arg === '--solution') { options.solutionPath = required(value, arg); index++; }
     else if (arg === '--policy') { options.policyPath = required(value, arg); index++; }
     else if (arg === '--prefix') { options.prefixPath = required(value, arg); index++; }
+    else if (arg === '--seed-manifest') { options.seedManifestPath = required(value, arg); index++; }
+    else if (arg === '--train-seeds') { options.trainSeedsPath = required(value, arg); index++; }
+    else if (arg === '--validation-seeds') { options.validationSeedsPath = required(value, arg); index++; }
+    else if (arg === '--test-seeds') { options.testSeedsPath = required(value, arg); index++; }
+    else if (arg === '--results') { options.resultsPath = required(value, arg); index++; }
+    else if (arg === '--replays-dir') { options.replayDirectory = required(value, arg); index++; }
+    else if (arg === '--split') { options.manifestSplit = parseManifestSplit(required(value, arg)); index++; }
+    else if (arg === '--count') { options.manifestCount = Number(required(value, arg)); index++; }
+    else if (arg === '--planner') { options.seedSolveMode = parseSeedSolveMode(required(value, arg)); index++; }
     else if (arg === '--json') options.json = true;
     else if (arg === '--help' || arg === '-h') options.command = 'help';
     else throw new Error(`Unknown argument: ${arg}`);
@@ -341,11 +484,34 @@ function parseArgs(args: string[]): CliOptions {
 
 async function readPolicy(filename: string): Promise<PolicyWeights> {
   const parsed = JSON.parse(await readFile(path.resolve(filename), 'utf8')) as unknown;
-  const candidate = isRecord(parsed) && 'policy' in parsed ? parsed.policy : parsed;
+  const candidate = isRecord(parsed) && 'policy' in parsed
+    ? parsed.policy
+    : isRecord(parsed) && 'weights' in parsed
+      ? parsed.weights
+      : parsed;
   if (!isPolicyWeights(candidate)) {
     throw new Error(`Policy file ${filename} does not contain valid policy weights`);
   }
   return candidate;
+}
+
+async function readGlobalPolicyArtifact(
+  filename: string | undefined,
+  scenarioFingerprint: BenchmarkFingerprint,
+): Promise<GlobalPolicyArtifact> {
+  if (!filename) return createPolicyArtifact(DEFAULT_POLICY, scenarioFingerprint);
+  const parsed = JSON.parse(await readFile(path.resolve(filename), 'utf8')) as unknown;
+  if (isRecord(parsed)
+    && parsed.kind === 'deterministic-heuristic'
+    && 'weights' in parsed
+    && 'fingerprint' in parsed) {
+    return parsed as unknown as GlobalPolicyArtifact;
+  }
+  return createPolicyArtifact(await readPolicy(filename), scenarioFingerprint);
+}
+
+async function readSeedManifest(filename: string): Promise<SeedManifest> {
+  return JSON.parse(await readFile(path.resolve(filename), 'utf8')) as SeedManifest;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -373,6 +539,16 @@ function parseRange(value: string): [number, number] {
   const match = value.match(/^(-?\d+):(-?\d+)$/);
   if (!match) throw new Error('--seed-range must be FROM:TO');
   return [Number(match[1]), Number(match[2])];
+}
+
+function parseManifestSplit(value: string): SeedManifestSplit {
+  if (value === 'train' || value === 'validation' || value === 'test') return value;
+  throw new Error('--split must be train, validation, or test');
+}
+
+function parseSeedSolveMode(value: string): SeedSolveMode {
+  if (value === 'beam' || value === 'proof') return value;
+  throw new Error('--planner must be beam or proof');
 }
 
 function assertFixedSeed(scenarioSeed: number, solutionSeed: number, options: CliOptions): void {
@@ -435,7 +611,7 @@ async function resolveProjectPath(configured?: string): Promise<string> {
   throw new Error(`Could not find a .ltproj. Tried: ${candidates.join(', ')}`);
 }
 
-async function writeJson(filename: string, result: SolverResult): Promise<void> {
+async function writeJson(filename: string, result: unknown): Promise<void> {
   const resolved = path.resolve(filename);
   await mkdir(path.dirname(resolved), { recursive: true });
   await writeFile(resolved, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
@@ -500,6 +676,53 @@ function formatSummary(result: SolverResult): string {
   ].join('\n');
 }
 
+function formatManifestSummary(manifest: SeedManifest): string {
+  return [
+    `PRECOMMITTED ${manifest.split.toUpperCase()} SEED MANIFEST — ${manifest.scenario}`,
+    `${manifest.seeds.length} deterministic seeds; no filtering or seed optimization`,
+    `scenario ${manifest.scenarioFingerprint.instanceSha256}`,
+    `manifest ${manifest.fingerprint}`,
+  ].join('\n');
+}
+
+function formatPolicySummary(report: PolicyEvaluationReport): string {
+  const aggregate = report.aggregate;
+  return [
+    `GLOBAL POLICY ${report.manifestSplit.toUpperCase()} — ${report.scenario}`,
+    `${aggregate.clears}/${aggregate.seeds} clears (${(aggregate.solveCoverage * 100).toFixed(1)}%); every manifest seed reported`,
+    `${aggregate.seedsWithDeaths} seeds with deaths, ${aggregate.totalDeaths} total deaths`,
+    `damage worst ${aggregate.worstDamage}, CVaR-95 ${aggregate.cvar95Damage.toFixed(3)}, mean ${aggregate.meanDamage.toFixed(3)}`,
+    `mean ${aggregate.meanTurns.toFixed(3)} turns, ${aggregate.meanActions.toFixed(3)} actions`,
+    `global score [${report.score.join(', ')}]`,
+    `manifest ${report.manifestFingerprint}`,
+    `policy ${report.policyFingerprint}`,
+  ].join('\n');
+}
+
+function formatTrainingSummary(training: PolicyTrainingReport): string {
+  const selection = training.selectedPolicy.selection;
+  return [
+    `GLOBAL POLICY TRAINING — ${training.scenario}`,
+    `${training.iterations} training-only iterations; ${training.checkpoints.length} validation checkpoints`,
+    `selected checkpoint ${selection?.selectedCheckpointIteration ?? 0}`,
+    `train score [${selection?.trainScore.join(', ') ?? ''}]`,
+    `validation score [${selection?.validationScore.join(', ') ?? ''}]`,
+    `policy ${training.selectedPolicy.fingerprint}`,
+    'held-out test seeds were not loaded or evaluated',
+  ].join('\n');
+}
+
+function formatSeedSolveSummary(report: SeedSolveReport): string {
+  const failures = report.runs.filter((run) => run.status !== 'clear');
+  return [
+    `PER-SEED ${report.mode.toUpperCase()} FARM — ${report.scenario}`,
+    `${report.solvedSeeds}/${report.attemptedSeeds} seeds solved (${(report.solveCoverage * 100).toFixed(1)}% coverage)`,
+    `${failures.length} failures/unknowns/errors retained in the report`,
+    `manifest ${report.manifestFingerprint}`,
+    'Routes are per-seed best-found witnesses unless proof status says exhaustive infeasible.',
+  ].join('\n');
+}
+
 function printHelp(): void {
   console.log(`Fire Emblem level solver\n\n` +
     `  npm run solver -- inspect [--scenario FILE] [--project PATH]\n` +
@@ -512,6 +735,13 @@ function printHelp(): void {
     `  npm run solver -- solve [--iterations N] [--workers N] [--solution FILE | --policy FILE] [--solution-out FILE] [--html FILE] [--fragment FILE]\n` +
     `  npm run solver -- verify --solution FILE\n\n` +
     `  npm run solver -- refresh --scenario FILE --solution FILE --solution-out FILE\n\n` +
+    `Global seed-agnostic policy pipeline:\n` +
+    `  npm run solver -- create-seed-manifest --scenario FILE --split train|validation|test --count N --out FILE\n` +
+    `  npm run solver -- evaluate-policy --scenario FILE --seed-manifest FILE [--policy FILE] [--workers N] --out FILE\n` +
+    `  npm run solver -- train-policy --scenario FILE --train-seeds FILE --validation-seeds FILE [--policy FILE] --iterations N --out POLICY [--results FILE]\n` +
+    `  npm run solver -- verify-policy --scenario FILE --test-seeds FILE --policy FILE [--workers N] --out FILE\n` +
+    `  npm run solver -- solve-seeds --scenario FILE --seed-manifest FILE [--planner beam|proof] [--workers N] --out FILE\n` +
+    `  npm run solver -- report-policy --results FILE --html FILE [--replays-dir DIR]\n\n` +
     `The scenario seed is a fixed benchmark input. --policy imports only heuristic weights and never trusts stale metrics. ` +
     `refresh revalidates every action before migrating an old plan. Non-benchmark RNG diagnostics require both ` +
     `--seed-range A:B and --allow-seed-search.`);

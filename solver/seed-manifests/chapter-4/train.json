@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "kind": "lt-web-seed-manifest",
+  "scenario": "Sacred Stones Ch. 4: Ancient Horrors",
+  "levelNid": "4",
+  "scenarioFingerprint": {
+    "version": 1,
+    "scenarioSha256": "199360ff512164382f85bad6f001e632d6070115e7c7738ff4b0b02885129a0b",
+    "projectDataSha256": "a22fb5b668c7c9219bc346ea8d79b34f37f100ab09ba13245fcb0860e0aaf8fc",
+    "engineSourceSha256": "1a44addc3970455a427acb510f2b9db79262d252870e4f333bb557143dc282c7",
+    "instanceSha256": "91630576eef46a07cf67cb0a9ab6c059b9151cf1a45d4ca05203b1b191be2792"
+  },
+  "split": "train",
+  "derivation": "sha256-scenario-split-index-v1",
+  "seeds": [
+    1058074940,
+    1000920855,
+    209426046,
+    864085309,
+    1081707011,
+    1464078179,
+    296823872,
+    425324599,
+    338863720,
+    1686888130,
+    447889096,
+    705472189
+  ],
+  "fingerprint": "bf5f6d26e87f6a4a46ae2e28373ead7a49125fc04839a3ddede518069a6272da"
+}

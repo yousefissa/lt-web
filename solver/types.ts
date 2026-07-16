@@ -1,4 +1,5 @@
 import type { RngMode } from '../src/combat/combat-solver';
+import type { EngineParityUnit } from '../src/engine/parity';
 
 export type Position = [number, number];
 export type SolverPhase = 'player' | 'enemy' | 'other';
@@ -341,4 +342,167 @@ export interface SearchOptions {
   shardIndex?: number;
   shardCount?: number;
   onImprovement?: (result: SolverResult, iteration: number) => void;
+}
+
+export type SeedManifestSplit = 'train' | 'validation' | 'test';
+
+/**
+ * Immutable, precommitted seed set. Seeds are derived from the seed-neutral
+ * scenario fingerprint, split name, and index rather than searched or sampled.
+ */
+export interface SeedManifest {
+  version: 1;
+  kind: 'lt-web-seed-manifest';
+  scenario: string;
+  levelNid: string;
+  scenarioFingerprint: BenchmarkFingerprint;
+  split: SeedManifestSplit;
+  derivation: 'sha256-scenario-split-index-v1';
+  seeds: number[];
+  fingerprint: string;
+}
+
+export interface PolicyLegalAction {
+  action: PlannerAction;
+  /** True when scenario completion explicitly requires this interaction. */
+  required: boolean;
+}
+
+/** Seed- and RNG-free input supplied to a closed-loop policy. */
+export interface PolicyObservation {
+  version: 1;
+  levelNid: string;
+  objective: Exclude<SolverObjectiveType, 'auto'>;
+  turn: number;
+  phase: 'player';
+  units: ReadonlyArray<Readonly<EngineParityUnit>>;
+  activeRegions: readonly string[];
+  visibleLayers: readonly string[];
+  interactions: Readonly<SolverInteractionState>;
+  map: Readonly<MapSnapshot>;
+  legalActions: ReadonlyArray<Readonly<PolicyLegalAction>>;
+}
+
+/** Reusable policy contract. Implementations can return only a listed action. */
+export interface ClosedLoopPolicy {
+  readonly kind: 'deterministic-heuristic';
+  readonly deterministic: true;
+  readonly weights: PolicyWeights;
+  selectAction(observation: PolicyObservation): PlannerAction | null;
+}
+
+export interface GlobalPolicySelection {
+  trainManifestFingerprint: string;
+  validationManifestFingerprint: string;
+  iterations: number;
+  searchSeed: number;
+  selectedCheckpointIteration: number;
+  checkpointsEvaluated: number;
+  trainScore: number[];
+  validationScore: number[];
+}
+
+export interface GlobalPolicyArtifact {
+  version: 1;
+  kind: 'deterministic-heuristic';
+  deterministic: true;
+  scenarioFingerprint: BenchmarkFingerprint;
+  weights: PolicyWeights;
+  selection?: GlobalPolicySelection;
+  fingerprint: string;
+}
+
+export type PolicyRunStatus = 'clear' | 'failed' | 'error';
+
+export interface PolicySeedRun {
+  index: number;
+  seed: number;
+  status: PolicyRunStatus;
+  result?: SolverResult;
+  error?: string;
+}
+
+export interface GlobalPolicyAggregate {
+  seeds: number;
+  clears: number;
+  failedClears: number;
+  errors: number;
+  seedsWithDeaths: number;
+  totalDeaths: number;
+  worstDamage: number;
+  cvar95Damage: number;
+  meanDamage: number;
+  meanTurns: number;
+  meanActions: number;
+  solveCoverage: number;
+}
+
+export interface PolicyRepresentatives {
+  typicalSeed?: number;
+  worstSuccessfulSeed?: number;
+  failedSeed?: number;
+}
+
+export interface PolicyEvaluationReport {
+  version: 1;
+  kind: 'global-policy-evaluation';
+  scenario: string;
+  levelNid: string;
+  scenarioFingerprint: BenchmarkFingerprint;
+  manifestFingerprint: string;
+  manifestSplit: SeedManifestSplit;
+  policyFingerprint: string;
+  policy: GlobalPolicyArtifact;
+  aggregate: GlobalPolicyAggregate;
+  score: number[];
+  representatives: PolicyRepresentatives;
+  runs: PolicySeedRun[];
+}
+
+export interface PolicyTrainingCheckpoint {
+  iteration: number;
+  trainScore: number[];
+  validationScore: number[];
+  policyFingerprint: string;
+}
+
+export interface PolicyTrainingReport {
+  version: 1;
+  kind: 'global-policy-training';
+  scenario: string;
+  levelNid: string;
+  scenarioFingerprint: BenchmarkFingerprint;
+  trainManifestFingerprint: string;
+  validationManifestFingerprint: string;
+  iterations: number;
+  searchSeed: number;
+  selectedPolicy: GlobalPolicyArtifact;
+  checkpoints: PolicyTrainingCheckpoint[];
+}
+
+export type SeedSolveMode = 'beam' | 'proof';
+
+export interface SeedSolveRun {
+  index: number;
+  seed: number;
+  status: PolicyRunStatus | 'infeasible' | 'unknown';
+  result?: SolverResult;
+  proof?: ProofSearchStats;
+  error?: string;
+}
+
+export interface SeedSolveReport {
+  version: 1;
+  kind: 'per-seed-solve-coverage';
+  mode: SeedSolveMode;
+  scenario: string;
+  levelNid: string;
+  scenarioFingerprint: BenchmarkFingerprint;
+  manifestFingerprint: string;
+  manifestSplit: SeedManifestSplit;
+  policyFingerprint: string;
+  attemptedSeeds: number;
+  solvedSeeds: number;
+  solveCoverage: number;
+  runs: SeedSolveRun[];
 }

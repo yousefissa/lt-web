@@ -854,6 +854,11 @@ export class TacticalSimulator {
     return this.mapSnapshot();
   }
 
+  /** Expose only scenario completion relevance, not hidden RNG state, to policy adapters. */
+  isRequiredPolicyAction(action: PlannerAction): boolean {
+    return this.isRequiredInteractionAction(action);
+  }
+
   /** Snapshot for action-boundary comparison with window.__harness. */
   getParityState(): EngineParityState {
     return {

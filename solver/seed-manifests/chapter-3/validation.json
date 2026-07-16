@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "kind": "lt-web-seed-manifest",
+  "scenario": "Sacred Stones Ch. 3: The Bandits of Borgo",
+  "levelNid": "3",
+  "scenarioFingerprint": {
+    "version": 1,
+    "scenarioSha256": "53f4c9585d7e3b2edd51f4b6459b2e219076e05b11498c46dd679231ec0b46cd",
+    "projectDataSha256": "a22fb5b668c7c9219bc346ea8d79b34f37f100ab09ba13245fcb0860e0aaf8fc",
+    "engineSourceSha256": "1a44addc3970455a427acb510f2b9db79262d252870e4f333bb557143dc282c7",
+    "instanceSha256": "6502e3da85238b12afc82c70fa2d39aa20a7d9be1f6e9f9ba55599285b218ebe"
+  },
+  "split": "validation",
+  "derivation": "sha256-scenario-split-index-v1",
+  "seeds": [
+    534012533,
+    789462786,
+    302563437,
+    1423830658,
+    1523182429,
+    1602908899
+  ],
+  "fingerprint": "3ed97c533e4f54963c3d8e75d1368adca267e13aae7cdbf951d4b5e12cef38ac"
+}

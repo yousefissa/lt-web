@@ -449,6 +449,20 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
   non-benchmark diagnostics. `--policy` imports heuristic weights without
   trusting stale artifacts, while `refresh` replays every saved action before
   migrating a route to a current benchmark fingerprint.
+- **Global policy pipeline**: A deterministic closed-loop policy consumes only
+  deeply frozen observable tactical state and complete legal actions. It never
+  receives the numeric scenario seed, raw RNG state, simulator object, or
+  future rolls. Immutable train/validation/test seed manifests are derived from
+  seed-neutral scenario/project/engine fingerprints plus split/index and are
+  validated against reordering, filtering, or mutation. Parallel evaluation
+  reports every seed; training mutates/checks candidates on train seeds only,
+  selects checkpoints on validation, and reserves `verify-policy` for the held-
+  out test manifest. Global scores lexicographically minimize failed clears,
+  death-bearing seeds, deaths, worst/CVaR-95/mean damage, turns, then actions.
+- **Per-seed coverage farm**: `solve-seeds` invokes the existing fixed-seed
+  beam or proof search for every immutable manifest entry and reports solve
+  coverage, per-seed witnesses, failures, unknown proofs, and errors without
+  selecting or discarding seeds.
 - **Planner state**: Versioned checkpoints and independent clones preserve RNG,
   turn/event lifecycle, metrics, unit flags/stats/positions, inventories/uses,
   explicit equipment, exact skills and mutable skill data, active
@@ -600,8 +614,11 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
 | `transposition.ts` | Pareto dominance table for exact future-state hashes |
 | `search.ts` | Seed scans, policy mutation, hill climbing, result ordering |
 | `parallel-search.ts` / `worker.ts` | Multi-core search sharding |
+| `global-policy.ts` / `global-policy-worker.ts` | Seed-isolated closed-loop policy API, deterministic manifests, global scoring/training/evaluation, and per-seed solve farms |
+| `policy-report.ts` | Aggregate HTML plus typical/worst/failed representative replay pages |
 | `visualize.ts` | Standalone and Codex-inline replay renderers |
 | `scenarios/chapter-{3,4,5}.json` | Controllable roster/loadout/seed/event/interaction fixtures |
+| `seed-manifests/chapter-{3,4,5}/*.json` | Precommitted train/validation/held-out test distributions |
 | `solutions/chapter-{3,4,5}.json` | Canonical verifiable fixed-seed policies/plans |
 | `solutions/*-seed-selected.json` | Explicitly non-benchmark RNG diagnostics |
 
