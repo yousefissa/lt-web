@@ -28,6 +28,7 @@ export function consumeCombatItemUses(
   if (broken) {
     const inventoryIndex = unit.items.indexOf(item);
     if (inventoryIndex >= 0) unit.items.splice(inventoryIndex, 1);
+    unit.unequipWeapon(item);
   }
   return broken;
 }

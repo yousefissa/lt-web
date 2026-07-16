@@ -708,7 +708,7 @@ export class GameState {
     const win = this.currentLevel.objective.win.toLowerCase();
 
     // Rout: all enemy units dead
-    if (win.includes('rout') || win.includes('defeat all')) {
+    if (win.includes('rout') || win.includes('defeat all') || win.includes('defeat enemy')) {
       const enemies = this.board?.getTeamUnits('enemy') ?? [];
       const livingEnemies = enemies.filter((u) => !u.isDead());
       return livingEnemies.length === 0;
@@ -1052,6 +1052,7 @@ export class GameState {
         this.items.set(`${unit.nid}_${item.nid}_${unit.items.length}`, item);
       }
     }
+    unit.getEquippedWeapon();
 
     // Equip personal and class skills available at the unit's starting level.
     // LT stores the component NIDs on both the unit prefab and its class;

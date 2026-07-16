@@ -55,6 +55,8 @@ export class UnitObject {
   maxStats: Record<string, number>;
 
   items: ItemObject[];
+  /** Explicitly equipped weapon. Equipment does not reorder inventory in LT. */
+  equippedWeapon: ItemObject | null;
   skills: SkillObject[];
   tags: string[];
   ai: NID;
@@ -141,6 +143,7 @@ export class UnitObject {
     // Items and skills are populated externally after construction
     // (they require their own prefab look-ups).
     this.items = [];
+    this.equippedWeapon = null;
     this.skills = [];
     this.tags = [...prefab.tags];
     this.ai = 'None';
@@ -217,7 +220,7 @@ export class UnitObject {
    *             implemented; 'fixed' and 'dynamic' fall back to random.
    * @returns Record of stat gains (e.g. { HP: 1, STR: 1, SPD: 0 })
    */
-  levelUp(mode: string = 'random'): Record<string, number> {
+  levelUp(mode: string = 'random', randomSource: () => number = random): Record<string, number> {
     const gains: Record<string, number> = {};
 
     for (const [stat, growth] of Object.entries(this.growths)) {
@@ -233,7 +236,7 @@ export class UnitObject {
         // Growths can exceed 100 (guaranteed +1, then roll for +2)
         let remaining = growth;
         while (remaining > 0) {
-          const roll = random() * 100;
+          const roll = randomSource() * 100;
           if (roll < remaining) {
             gained++;
           }
@@ -266,9 +269,35 @@ export class UnitObject {
   // Item helpers
   // ------------------------------------------------------------------
 
-  /** Get the first usable weapon in the inventory. */
+  /** Get the equipped weapon, auto-equipping the first usable weapon if needed. */
   getEquippedWeapon(): ItemObject | null {
-    return this.items.find((item) => item.isWeapon() && (!item.maxUses || item.uses > 0)) ?? null;
+    if (
+      this.equippedWeapon &&
+      this.items.includes(this.equippedWeapon) &&
+      this.equippedWeapon.isWeapon() &&
+      this.equippedWeapon.hasUsesRemaining()
+    ) {
+      return this.equippedWeapon;
+    }
+    this.equippedWeapon = this.items.find(
+      (item) => item.isWeapon() && item.hasUsesRemaining(),
+    ) ?? null;
+    return this.equippedWeapon;
+  }
+
+  /** Equip a weapon without changing inventory order, matching Python LT. */
+  equipWeapon(item: ItemObject): void {
+    if (!this.items.includes(item) || !item.isWeapon() || !item.hasUsesRemaining()) {
+      throw new Error(`Cannot equip ${item.nid} on ${this.nid}`);
+    }
+    this.equippedWeapon = item;
+  }
+
+  /** Clear a removed/broken weapon and select the next usable inventory weapon. */
+  unequipWeapon(item: ItemObject): void {
+    if (this.equippedWeapon !== item) return;
+    this.equippedWeapon = null;
+    this.getEquippedWeapon();
   }
 
   /** Get all healing/consumable items that can be used. */

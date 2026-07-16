@@ -207,6 +207,8 @@ export interface TacticalUnitCheckpoint {
   ai: string;
   aiGroup: string;
   items: TacticalItemCheckpoint[];
+  /** Inventory slot of the explicitly equipped weapon, if any. */
+  equippedItemIndex: number | null;
   hasAttacked: boolean;
   hasMoved: boolean;
   hasTraded: boolean;

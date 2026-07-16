@@ -3,6 +3,7 @@ import type { ItemObject } from '../objects/item';
 import type { CombatStrike } from './combat-solver';
 import { CombatPhaseSolver, type RngMode } from './combat-solver';
 import { consumeCombatItemUses } from './combat-uses';
+import { grantCombatExperience } from './combat-exp';
 import type { CombatResults, DamagePopup } from './map-combat';
 import { BattleAnimation, type BattleAnimDrawData } from './battle-animation';
 import type { CombatEffectData, PaletteData } from './battle-anim-types';
@@ -1059,20 +1060,13 @@ export class AnimationCombat implements AnimationCombatOwner {
       defenseWeaponBroke = consumeCombatItemUses(this.defender, this.defenseItem, this.strikes);
     }
 
-    // EXP
-    const expGained = this.calculateExp(attackerDead, defenderDead);
-
-    let levelUps: Record<string, number>[] = [];
-    const growthMode = (this.db.getConstant?.('growths_choice', 'random') as string) || 'random';
-
-    if (!attackerDead && this.attacker.team === 'player' && expGained > 0) {
-      this.attacker.exp += expGained;
-      while (this.attacker.exp >= 100) {
-        this.attacker.exp -= 100;
-        const gains = this.attacker.levelUp(growthMode);
-        levelUps.push(gains);
-      }
-    }
+    const { expGained, levelUps } = grantCombatExperience(
+      this.attacker,
+      this.defender,
+      attackerDead,
+      defenderDead,
+      this.db,
+    );
 
     let droppedItem: ItemObject | null = null;
     if (defenderDead && !attackerDead) {
@@ -1093,21 +1087,6 @@ export class AnimationCombat implements AnimationCombatOwner {
       defenseWeaponBroke,
       droppedItem,
     };
-  }
-
-  private calculateExp(attackerDead: boolean, defenderDead: boolean): number {
-    if (attackerDead) return 0;
-
-    const BASE_EXP = 30;
-    const KILL_BONUS = 50;
-    const levelDiff = this.defender.level - this.attacker.level;
-    const levelScale = Math.max(0.1, 1 + levelDiff * 0.1);
-
-    let exp = Math.round(BASE_EXP * levelScale);
-    if (defenderDead) {
-      exp += Math.round(KILL_BONUS * levelScale);
-    }
-    return Math.max(1, Math.min(100, exp));
   }
 
   // ================================================================

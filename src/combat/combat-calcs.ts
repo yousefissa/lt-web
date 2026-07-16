@@ -303,7 +303,7 @@ export function avoid(unit: UnitObject, db: Database, board?: GameBoard | null):
   const eqName = formulaOverride ?? 'AVOID';
 
   // Avoid uses AS (attack speed), which factors in equipped weapon weight.
-  const equippedWeapon = unit.items.find((i) => i.isWeapon()) ?? null;
+  const equippedWeapon = unit.getEquippedWeapon();
   const weaponWeight = equippedWeapon ? equippedWeapon.getWeight() : 0;
   const spd = unit.getStatValue('SPD');
   const con = unit.getStatValue('CON');
@@ -430,7 +430,7 @@ export function computeHit(
   const avo = avoid(defender, db, board);
 
   // Dynamic modifiers from items and skills (combat context)
-  const defWeapon = defender.items.find((i) => i.isWeapon()) ?? null;
+  const defWeapon = defender.getEquippedWeapon();
   const itemDynAcc = itemSystem.dynamicAccuracy(attacker, attackItem, defender, defWeapon, 'attack', null, acc);
   const skillDynAcc = skillSystem.dynamicAccuracy(attacker, attackItem, defender, defWeapon, 'attack', null, acc);
   const skillDynAvo = skillSystem.dynamicAvoid(defender, defWeapon, attacker, attackItem, 'defense', null, avo);
@@ -459,7 +459,7 @@ export function computeDamage(
   const def = defense(defender, attackItem, db, board);
 
   // Dynamic modifiers from items and skills
-  const defWeapon = defender.items.find((i) => i.isWeapon()) ?? null;
+  const defWeapon = defender.getEquippedWeapon();
   const baseDmg = atk - def;
 
   const itemDynDmg = itemSystem.dynamicDamage(attacker, attackItem, defender, defWeapon, 'attack', null, baseDmg);
@@ -505,7 +505,7 @@ export function canDouble(
   const attackerAS = attackSpeed(attacker, attackItem, db);
 
   // Use defense speed for the defender's side
-  const defenderWeapon = defenseItem ?? defender.items.find((i) => i.isWeapon()) ?? null;
+  const defenderWeapon = defenseItem ?? defender.getEquippedWeapon();
   const defenderAS = defenderWeapon
     ? defenseSpeed(defender, defenderWeapon, db)
     : defender.getStatValue('SPD');
@@ -552,7 +552,7 @@ export function canCounterattack(
   if (!skillSystem.canCounter(defender)) return false;
 
   // Find the defender's equipped weapon
-  const defWeapon = defender.items.find((i) => i.isWeapon());
+  const defWeapon = defender.getEquippedWeapon();
   if (!defWeapon) return false;
 
   // Check if the weapon itself can counter
@@ -713,10 +713,7 @@ export function getSupportBonusForCombat(unit: UnitObject, game?: any): SupportE
 // Legacy convenience wrappers (used by AI / other subsystems)
 // ------------------------------------------------------------------
 
-/** Get the first usable weapon from a unit's inventory. */
+/** Get the unit's explicit equipped weapon, auto-equipping if needed. */
 export function getEquippedWeapon(unit: UnitObject): ItemObject | null {
-  for (const item of unit.items) {
-    if (item.isWeapon()) return item;
-  }
-  return null;
+  return unit.getEquippedWeapon();
 }

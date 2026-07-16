@@ -3,78 +3,78 @@
   "levelNid": "4",
   "objective": "rout",
   "seed": 4,
-  "rngState": 4272238400,
+  "rngState": 3760708824,
   "rngMode": "true_hit",
   "policy": {
-    "kill": 62.21669880028063,
-    "bossKill": 1919.1892889211333,
-    "damage": 1.3138735643336754,
-    "counterDamage": 19.07276588787063,
-    "lethalRisk": 996.835390888948,
-    "progress": 11.097115148227692,
-    "danger": 2.7195824744620354,
-    "wall": 336.745489792144,
-    "heal": 1.6924606235387898,
-    "stayHealthy": 28.92268162999958,
+    "kill": 1.1091494246856712,
+    "bossKill": 51.27754863984769,
+    "damage": 0.7605435692637217,
+    "counterDamage": 8.550141435037906,
+    "lethalRisk": 1743.5195044496502,
+    "progress": 11.750038358802817,
+    "danger": 11.486744083972797,
+    "wall": 204.79589549062555,
+    "heal": 0.02837962931429362,
+    "stayHealthy": 25.24546276081463,
     "unitBias": {
-      "Seth": -8.111152024939656,
-      "Eirika": 6.704451102763414,
-      "Franz": 22.939579736441374,
-      "Gilliam": 25.28621352277696,
-      "Garcia": 81.71840366721153,
-      "Vanessa": -18.13453410938382,
-      "Ross": 11.140519127249718,
-      "Neimi": 9.909088177606463,
-      "Moulder": 12.26349033229053,
-      "Colm": 0,
-      "Artur": 0
+      "Seth": 5.020364161580801,
+      "Eirika": 20.657797891646624,
+      "Franz": -27.1659446451813,
+      "Gilliam": -59.255603874102235,
+      "Garcia": -23.0854995790869,
+      "Vanessa": 3.226263275370002,
+      "Ross": -22.218295138329268,
+      "Neimi": 10.399010373279452,
+      "Moulder": -27.94857860915363,
+      "Colm": 10.410000521689653,
+      "Artur": -28.83111510425806
     },
     "unitRisk": {
-      "Eirika": 1,
-      "Seth": 1,
-      "Gilliam": 1,
-      "Vanessa": 1,
-      "Moulder": 1,
-      "Ross": 1,
-      "Colm": 1,
-      "Neimi": 1,
-      "Artur": 1
+      "Eirika": 6.646550913998552,
+      "Seth": 1.8739102503635354,
+      "Gilliam": 0.49725800789357216,
+      "Vanessa": 1.602623098750057,
+      "Moulder": 1.2687443706720376,
+      "Ross": 0.5023165225973298,
+      "Colm": 0.5560248728334695,
+      "Neimi": 0.724864520898372,
+      "Artur": 0.9237630701963535
     }
   },
   "metrics": {
     "cleared": true,
     "lost": false,
-    "turns": 5,
-    "actions": 82,
-    "combats": 38,
-    "damageTaken": 22,
-    "healingReceived": 22,
+    "turns": 6,
+    "actions": 90,
+    "combats": 34,
+    "damageTaken": 2,
+    "healingReceived": 2,
     "playerDeaths": 0,
     "enemiesDefeated": 22,
     "wallsBroken": 1,
-    "remainingPlayerHp": 190,
+    "remainingPlayerHp": 215,
     "remainingEnemyHp": 0
   },
   "score": [
     0,
     0,
-    22,
-    5,
-    82
+    2,
+    6,
+    90
   ],
   "plan": [
     {
       "type": "attack",
       "turn": 1,
-      "actor": "Vanessa",
-      "target": "Snag",
-      "item": "Javelin",
-      "itemIndex": 1,
+      "actor": "Neimi",
+      "target": "101",
+      "item": "Iron_Bow",
+      "itemIndex": 0,
       "position": [
-        4,
-        7
+        1,
+        3
       ],
-      "heuristic": 417.28992546494817
+      "heuristic": 76.67957952397784
     },
     {
       "type": "attack",
@@ -87,46 +87,38 @@
         0,
         3
       ],
-      "heuristic": 218.17686414688936
+      "heuristic": 146.89142057829602
     },
     {
-      "type": "attack",
+      "type": "visit",
       "turn": 1,
-      "actor": "Eirika",
-      "target": "103",
-      "item": "Rapier",
-      "itemIndex": 0,
+      "actor": "Vanessa",
+      "region": "Village1",
       "position": [
-        5,
-        7
+        8,
+        2
       ],
-      "heuristic": 121.31325997250741
+      "heuristic": 311.75003835880284
     },
     {
-      "type": "attack",
+      "type": "move",
       "turn": 1,
-      "actor": "Neimi",
-      "target": "109",
-      "item": "Iron_Bow",
-      "itemIndex": 0,
+      "actor": "Colm",
       "position": [
-        2,
+        4,
         5
       ],
-      "heuristic": 93.46732538530898
+      "heuristic": 72.11532026573845
     },
     {
-      "type": "attack",
+      "type": "move",
       "turn": 1,
-      "actor": "Artur",
-      "target": "102",
-      "item": "Lightning",
-      "itemIndex": 0,
+      "actor": "Eirika",
       "position": [
-        10,
-        3
+        4,
+        4
       ],
-      "heuristic": 70.81421227735294
+      "heuristic": 69.4033373700669
     },
     {
       "type": "move",
@@ -136,27 +128,7 @@
         2,
         3
       ],
-      "heuristic": 85.57463255520088
-    },
-    {
-      "type": "move",
-      "turn": 1,
-      "actor": "Colm",
-      "position": [
-        2,
-        4
-      ],
-      "heuristic": 84.40825737113803
-    },
-    {
-      "type": "move",
-      "turn": 1,
-      "actor": "Gilliam",
-      "position": [
-        4,
-        5
-      ],
-      "heuristic": 76.40312544923194
+      "heuristic": 32.54699922806945
     },
     {
       "type": "move",
@@ -166,82 +138,76 @@
         1,
         4
       ],
-      "heuristic": 51.16031590547699
+      "heuristic": 14.777205981288178
     },
     {
-      "type": "attack",
-      "turn": 2,
-      "actor": "Vanessa",
-      "target": "Snag",
-      "item": "Javelin",
-      "itemIndex": 1,
+      "type": "move",
+      "turn": 1,
+      "actor": "Gilliam",
+      "position": [
+        2,
+        5
+      ],
+      "heuristic": 1.2399739631208426
+    },
+    {
+      "type": "move",
+      "turn": 1,
+      "actor": "Artur",
       "position": [
         4,
-        7
+        3
       ],
-      "heuristic": 423.9938526993457
+      "heuristic": -3.5856523434434315
     },
     {
       "type": "attack",
       "turn": 2,
-      "actor": "Gilliam",
-      "target": "110",
-      "item": "Iron_Lance",
+      "actor": "Artur",
+      "target": "Snag",
+      "item": "Lightning",
       "itemIndex": 0,
       "position": [
-        4,
-        8
+        5,
+        7
       ],
-      "heuristic": 158.32792771451767
+      "heuristic": 90.12795380438013
     },
     {
       "type": "attack",
       "turn": 2,
       "actor": "Eirika",
-      "target": "109",
+      "target": "Snag",
       "item": "Rapier",
       "itemIndex": 0,
       "position": [
-        2,
-        7
+        5,
+        8
       ],
-      "heuristic": 92.3616885625697
+      "heuristic": 273.4454103270037
+    },
+    {
+      "type": "move",
+      "turn": 2,
+      "actor": "Seth",
+      "position": [
+        4,
+        3
+      ],
+      "heuristic": 77.2659803576067
     },
     {
       "type": "attack",
       "turn": 2,
-      "actor": "Artur",
-      "target": "113",
-      "item": "Lightning",
-      "itemIndex": 0,
-      "position": [
-        10,
-        4
-      ],
-      "heuristic": 70.40944283237577
-    },
-    {
-      "type": "heal",
-      "turn": 2,
-      "actor": "Moulder",
-      "target": "Neimi",
-      "item": "Heal",
+      "actor": "Neimi",
+      "target": "109",
+      "item": "Iron_Bow",
       "itemIndex": 0,
       "position": [
         3,
         5
       ],
-      "heuristic": 45.1385698094546
-    },
-    {
-      "type": "move",
-      "turn": 2,
-      "actor": "Ross",
-      "position": [
-        3,
-        6
-      ],
-      "heuristic": 84.45166135016007
+      "heuristic": 71.09082455295508
     },
     {
       "type": "move",
@@ -251,367 +217,432 @@
         3,
         7
       ],
-      "heuristic": 73.31114222291035
-    },
-    {
-      "type": "move",
-      "turn": 2,
-      "actor": "Seth",
-      "position": [
-        3,
-        4
-      ],
-      "heuristic": 65.19999019797069
-    },
-    {
-      "type": "move",
-      "turn": 2,
-      "actor": "Neimi",
-      "position": [
-        4,
-        6
-      ],
-      "heuristic": 49.92888495583374
+      "heuristic": 21.730101658689534
     },
     {
       "type": "attack",
-      "turn": 3,
-      "actor": "Seth",
-      "target": "104",
-      "item": "Silver_Lance",
+      "turn": 2,
+      "actor": "Vanessa",
+      "target": "110",
+      "item": "Javelin",
       "itemIndex": 1,
       "position": [
-        9,
-        5
+        6,
+        7
       ],
-      "heuristic": 205.67250910943443
+      "heuristic": 19.409696752919242
+    },
+    {
+      "type": "attack",
+      "turn": 2,
+      "actor": "Ross",
+      "target": "110",
+      "item": "Hatchet",
+      "itemIndex": 0,
+      "position": [
+        3,
+        6
+      ],
+      "heuristic": 53.73752948926422
+    },
+    {
+      "type": "move",
+      "turn": 2,
+      "actor": "Moulder",
+      "position": [
+        5,
+        2
+      ],
+      "heuristic": 20.796960869266634
+    },
+    {
+      "type": "move",
+      "turn": 2,
+      "actor": "Gilliam",
+      "position": [
+        3,
+        3
+      ],
+      "heuristic": -22.260102754484787
     },
     {
       "type": "attack",
       "turn": 3,
       "actor": "Gilliam",
-      "target": "111",
+      "target": "102",
       "item": "Iron_Lance",
       "itemIndex": 0,
       "position": [
+        5,
+        3
+      ],
+      "heuristic": -15.634439259553169
+    },
+    {
+      "type": "attack",
+      "turn": 3,
+      "actor": "Eirika",
+      "target": "105",
+      "item": "Rapier",
+      "itemIndex": 0,
+      "position": [
         4,
         8
       ],
-      "heuristic": 136.1336974180623
-    },
-    {
-      "type": "attack",
-      "turn": 3,
-      "actor": "Ross",
-      "target": "106",
-      "item": "Hatchet",
-      "itemIndex": 0,
-      "position": [
-        7,
-        6
-      ],
-      "heuristic": 94.23821497003283
-    },
-    {
-      "type": "attack",
-      "turn": 3,
-      "actor": "Neimi",
-      "target": "106",
-      "item": "Iron_Bow",
-      "itemIndex": 0,
-      "position": [
-        8,
-        5
-      ],
-      "heuristic": 124.6269613305497
+      "heuristic": -181.24937348841183
     },
     {
       "type": "attack",
       "turn": 3,
       "actor": "Artur",
-      "target": "116",
+      "target": "104",
       "item": "Lightning",
       "itemIndex": 0,
       "position": [
-        11,
-        4
-      ],
-      "heuristic": 77.77303594879817
-    },
-    {
-      "type": "attack",
-      "turn": 3,
-      "actor": "Vanessa",
-      "target": "108",
-      "item": "Javelin",
-      "itemIndex": 1,
-      "position": [
         7,
         7
       ],
-      "heuristic": 64.31314585603744
-    },
-    {
-      "type": "heal",
-      "turn": 3,
-      "actor": "Eirika",
-      "target": "Eirika",
-      "item": "Vulnerary",
-      "itemIndex": 1,
-      "position": [
-        5,
-        8
-      ],
-      "heuristic": 54.5432243341435
-    },
-    {
-      "type": "move",
-      "turn": 3,
-      "actor": "Moulder",
-      "position": [
-        5,
-        7
-      ],
-      "heuristic": 85.57463255520088
-    },
-    {
-      "type": "move",
-      "turn": 3,
-      "actor": "Colm",
-      "position": [
-        4,
-        9
-      ],
-      "heuristic": 62.214027074682654
+      "heuristic": -21.011712480396067
     },
     {
       "type": "attack",
-      "turn": 4,
+      "turn": 3,
+      "actor": "Neimi",
+      "target": "112",
+      "item": "Iron_Bow",
+      "itemIndex": 0,
+      "position": [
+        6,
+        4
+      ],
+      "heuristic": -13.188302208880678
+    },
+    {
+      "type": "attack",
+      "turn": 3,
+      "actor": "Ross",
+      "target": "104",
+      "item": "Hatchet",
+      "itemIndex": 0,
+      "position": [
+        8,
+        6
+      ],
+      "heuristic": -25.44825357095518
+    },
+    {
+      "type": "attack",
+      "turn": 3,
       "actor": "Seth",
-      "target": "107",
+      "target": "115",
       "item": "Silver_Lance",
       "itemIndex": 1,
       "position": [
         9,
         6
       ],
-      "heuristic": 162.97018965069012
+      "heuristic": 111.29588864157311
+    },
+    {
+      "type": "attack",
+      "turn": 3,
+      "actor": "Vanessa",
+      "target": "111",
+      "item": "Javelin",
+      "itemIndex": 1,
+      "position": [
+        2,
+        10
+      ],
+      "heuristic": 43.96324646374643
+    },
+    {
+      "type": "attack",
+      "turn": 3,
+      "actor": "Colm",
+      "target": "111",
+      "item": "Iron_Sword",
+      "itemIndex": 0,
+      "position": [
+        4,
+        9
+      ],
+      "heuristic": -7.23287053969903
+    },
+    {
+      "type": "move",
+      "turn": 3,
+      "actor": "Moulder",
+      "position": [
+        6,
+        6
+      ],
+      "heuristic": 56.04707594567509
+    },
+    {
+      "type": "visit",
+      "turn": 4,
+      "actor": "Vanessa",
+      "region": "Village2",
+      "position": [
+        1,
+        11
+      ],
+      "heuristic": 276.4999232823944
+    },
+    {
+      "type": "attack",
+      "turn": 4,
+      "actor": "Seth",
+      "target": "116",
+      "item": "Silver_Lance",
+      "itemIndex": 1,
+      "position": [
+        8,
+        4
+      ],
+      "heuristic": 81.15219316907
     },
     {
       "type": "attack",
       "turn": 4,
       "actor": "Neimi",
-      "target": "108",
+      "target": "114",
       "item": "Iron_Bow",
       "itemIndex": 0,
       "position": [
-        9,
-        9
-      ],
-      "heuristic": 110.86662971587069
-    },
-    {
-      "type": "attack",
-      "turn": 4,
-      "actor": "Ross",
-      "target": "117",
-      "item": "Hatchet",
-      "itemIndex": 0,
-      "position": [
-        10,
-        6
-      ],
-      "heuristic": 129.96832117072756
-    },
-    {
-      "type": "attack",
-      "turn": 4,
-      "actor": "Vanessa",
-      "target": "114",
-      "item": "Javelin",
-      "itemIndex": 1,
-      "position": [
-        10,
-        4
-      ],
-      "heuristic": 117.10996643989708
-    },
-    {
-      "type": "heal",
-      "turn": 4,
-      "actor": "Artur",
-      "target": "Artur",
-      "item": "Vulnerary",
-      "itemIndex": 1,
-      "position": [
-        13,
+        6,
         7
       ],
-      "heuristic": 70.71772135298757
-    },
-    {
-      "type": "move",
-      "turn": 4,
-      "actor": "Gilliam",
-      "position": [
-        3,
-        6
-      ],
-      "heuristic": 87.50024059745962
+      "heuristic": 38.61036193587335
     },
     {
       "type": "move",
       "turn": 4,
       "actor": "Eirika",
       "position": [
-        5,
-        4
+        7,
+        6
       ],
-      "heuristic": 80.01559332567376
-    },
-    {
-      "type": "move",
-      "turn": 4,
-      "actor": "Moulder",
-      "position": [
-        4,
-        5
-      ],
-      "heuristic": 74.47751740697319
+      "heuristic": 57.65329901126407
     },
     {
       "type": "move",
       "turn": 4,
       "actor": "Colm",
       "position": [
-        2,
-        7
+        5,
+        9
       ],
-      "heuristic": 73.31114222291035
+      "heuristic": 47.4055016413071
     },
     {
       "type": "attack",
-      "turn": 5,
-      "actor": "Seth",
-      "target": "Boss",
-      "item": "Silver_Lance",
-      "itemIndex": 1,
-      "position": [
-        10,
-        11
-      ],
-      "heuristic": 2116.867414909409
-    },
-    {
-      "type": "attack",
-      "turn": 5,
+      "turn": 4,
       "actor": "Gilliam",
       "target": "120",
       "item": "Iron_Lance",
       "itemIndex": 0,
       "position": [
-        4,
-        4
-      ],
-      "heuristic": 174.7248406423021
-    },
-    {
-      "type": "attack",
-      "turn": 5,
-      "actor": "Eirika",
-      "target": "119",
-      "item": "Rapier",
-      "itemIndex": 0,
-      "position": [
-        5,
+        2,
         2
       ],
-      "heuristic": 109.97743783862472
+      "heuristic": 39.95764310157587
     },
     {
-      "type": "attack",
-      "turn": 5,
-      "actor": "Vanessa",
-      "target": "121",
-      "item": "Javelin",
-      "itemIndex": 1,
+      "type": "move",
+      "turn": 4,
+      "actor": "Moulder",
       "position": [
-        5,
-        3
+        9,
+        7
       ],
-      "heuristic": 93.78434451195633
+      "heuristic": 20.796960869266634
     },
     {
       "type": "attack",
-      "turn": 5,
-      "actor": "Colm",
-      "target": "121",
-      "item": "Iron_Sword",
+      "turn": 4,
+      "actor": "Ross",
+      "target": "107",
+      "item": "Hatchet",
       "itemIndex": 0,
       "position": [
-        3,
-        4
+        10,
+        9
       ],
-      "heuristic": 127.71188590697068
+      "heuristic": 11.912119923747902
+    },
+    {
+      "type": "attack",
+      "turn": 4,
+      "actor": "Artur",
+      "target": "107",
+      "item": "Lightning",
+      "itemIndex": 0,
+      "position": [
+        9,
+        8
+      ],
+      "heuristic": -32.50148381303886
+    },
+    {
+      "type": "wait",
+      "turn": 4,
+      "actor": "Lute",
+      "position": [
+        1,
+        12
+      ],
+      "heuristic": -1
     },
     {
       "type": "move",
       "turn": 5,
-      "actor": "Ross",
+      "actor": "Seth",
       "position": [
-        5,
-        6
+        13,
+        7
       ],
-      "heuristic": 95.54877649838775
+      "heuristic": 124.26613379281797
+    },
+    {
+      "type": "move",
+      "turn": 5,
+      "actor": "Vanessa",
+      "position": [
+        8,
+        11
+      ],
+      "heuristic": 110.72199454780436
+    },
+    {
+      "type": "move",
+      "turn": 5,
+      "actor": "Eirika",
+      "position": [
+        9,
+        9
+      ],
+      "heuristic": 104.65345244647534
     },
     {
       "type": "move",
       "turn": 5,
       "actor": "Neimi",
       "position": [
-        7,
+        9,
         6
       ],
-      "heuristic": 94.3173455487445
+      "heuristic": 59.14454985169972
     },
     {
       "type": "move",
       "turn": 5,
+      "actor": "Colm",
+      "position": [
+        3,
+        12
+      ],
+      "heuristic": 47.4055016413071
+    },
+    {
+      "type": "move",
+      "turn": 5,
+      "actor": "Moulder",
+      "position": [
+        9,
+        11
+      ],
+      "heuristic": 44.297037586872264
+    },
+    {
+      "type": "heal",
+      "turn": 5,
       "actor": "Artur",
+      "target": "Artur",
+      "item": "Vulnerary",
+      "itemIndex": 1,
       "position": [
         10,
-        5
+        10
       ],
-      "heuristic": 84.40825737113803
+      "heuristic": 35.30687433503704
+    },
+    {
+      "type": "move",
+      "turn": 5,
+      "actor": "Gilliam",
+      "position": [
+        4,
+        4
+      ],
+      "heuristic": 12.990012321923661
+    },
+    {
+      "type": "move",
+      "turn": 5,
+      "actor": "Ross",
+      "position": [
+        11,
+        11
+      ],
+      "heuristic": 12.658565530527415
     },
     {
       "type": "wait",
       "turn": 5,
-      "actor": "Moulder",
+      "actor": "Lute",
       "position": [
-        4,
-        5
+        1,
+        12
       ],
       "heuristic": -1
+    },
+    {
+      "type": "attack",
+      "turn": 6,
+      "actor": "Eirika",
+      "target": "Boss",
+      "item": "Rapier",
+      "itemIndex": 0,
+      "position": [
+        10,
+        12
+      ],
+      "heuristic": -395.78987912568556
+    },
+    {
+      "type": "attack",
+      "turn": 6,
+      "actor": "Vanessa",
+      "target": "Boss",
+      "item": "Javelin",
+      "itemIndex": 1,
+      "position": [
+        11,
+        10
+      ],
+      "heuristic": 119.08262431926929
     }
   ],
-  "planner": {
-    "beamWidth": 72,
-    "branchLimit": 24,
-    "maxNodes": 80000,
-    "nodesGenerated": 80000,
-    "nodesAccepted": 71650,
-    "cacheHits": 5043,
-    "frontierPeak": 72,
-    "deepestTurn": 7,
-    "incumbentSource": "beam",
-    "elapsedMs": 56700.14825
+  "interactions": {
+    "visitedRegions": [
+      "Village1",
+      "Village2"
+    ],
+    "openedChests": [],
+    "openedDoors": [],
+    "destroyedRegions": [],
+    "recruitedUnits": [
+      "Lute"
+    ],
+    "requirementsSatisfied": true
   },
   "benchmark": {
     "version": 1,
     "scenarioSha256": "4fa573e0df261551beb463a5ee8c781d839754790f21dcd8c8d24327ddd7adec",
     "projectDataSha256": "a22fb5b668c7c9219bc346ea8d79b34f37f100ab09ba13245fcb0860e0aaf8fc",
-    "engineSourceSha256": "3d44921bd606ab01a25723f06fd227cfdd020de401273fffe2f83db0876e2780",
-    "instanceSha256": "79ea89da948c59b98c7f8c701290a113ed881855dbdd0c50fa6d583024453c01"
+    "engineSourceSha256": "a9b926f09923389506b6cbbab622e4c808cb12d1ceea80c4a90db738fdb71af3",
+    "instanceSha256": "19a0531c867e541f24b1aea418c5e73bd75ca839a14c644a0a16c18bebf1e344"
   }
 }

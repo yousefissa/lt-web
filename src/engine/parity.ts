@@ -18,6 +18,7 @@ export interface EngineParityUnit {
   hasTraded: boolean;
   finished: boolean;
   items: EngineParityItem[];
+  equippedItemIndex: number | null;
 }
 
 /** Renderer-independent action-boundary state shared by solver and harness. */

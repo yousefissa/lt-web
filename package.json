@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test:harness": "playwright test tests/harness.spec.ts",
+    "test:solver-parity": "playwright test tests/solver-parity.spec.ts",
     "test:ss:soak": "node scripts/sacred-stones-soak.mjs",
     "solver": "tsx solver/cli.ts",
     "solver:test": "tsx --test solver/**/*.test.ts",

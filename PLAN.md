@@ -8,8 +8,8 @@ Lex Talionis Python/Pygame engine.
 
 ## Current State
 
-**90 engine source files, ~46,700 lines of TypeScript, plus 13 solver runtime
-files (~4,300 lines) and 7 solver test files.**
+**91 engine source files, ~47,200 lines of TypeScript, plus 13 solver runtime
+files (~4,500 lines) and 7 solver test files.**
 Builds cleanly with zero type errors. All four development phases (Foundation,
 Playable, Visual Polish, Mobile/Distribution) are complete. The engine loads
 `.ltproj` game data over HTTP and runs at 60 fps on Canvas 2D with dynamic
@@ -111,6 +111,36 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 ### Recent Changes
 
+- **Fixed-seed live differential planner + combat/event parity correction:**
+  - Added explicit LT-style equipped-weapon state without inventory reordering,
+    persisted it through saves and cloneable solver checkpoints, and shared
+    combat EXP/level-up RNG between map combat, animation combat, and the
+    headless simulator.
+  - Matched Python LT enemy-phase ordering by AI priority and closest-enemy
+    distance, then fixed simulator movement/attack flags and dead-attacker
+    lifecycle semantics discovered by boundary diffs.
+  - Generalized standard turn events and repeatable region reinforcements,
+    including Chapter 4's turn-2 group, turn-3 cameo, and repeatable lower-map
+    trigger. Off-map level units now remain registered, and interaction events
+    support `change_team`, `add_unit`, `move_unit`, and `remove_unit` so visits
+    can recruit and place units such as Lute exactly like the live engine.
+  - Added exact live tactical checkpoint restoration and an async planner-action
+    driver for attacks, heals, moves, waits, visits, talks, doors, chests, and
+    seize interactions. The saved Chapter 4 route now passes field-level
+    simulator/live comparison after every player action and phase boundary,
+    including both village visits and Lute recruitment.
+  - Added safe `--policy` imports that reuse weights without trusting stale
+    metrics/fingerprints, plus `refresh`, which replays every fixed-seed action
+    before migrating a route to the current benchmark identity.
+  - Fixed-seed search improved Chapter 3 seed 3 to a 0-damage/0-death clear in
+    6 turns/73 actions. Chapter 4 seed 4 improved through 17, 13, 12, 5, and 2
+    damage incumbents; the canonical route is now 2 damage/0 deaths in 6
+    turns/90 total actions (49 player actions), visits both villages, and
+    recruits Lute. A 26,044-node <=1-damage frontier found no improvement; this
+    is best-found, not a proof. Chapter 5 seed 5 remains a verified
+    71-damage/0-death clear in 4 turns/66 actions with Joshua recruited after a
+    22,383-node <=70-damage challenge found no improvement.
+
 - **Dominance/proof search + engine parity audit:**
   - Split exact future-state identity from irreversible path cost. The
     transposition table now keeps Pareto-minimal death/damage/action labels and
@@ -129,8 +159,7 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
     their numeric seed happens to match.
   - Added a shared renderer-independent parity snapshot and field-level diff for
     solver/live-harness action boundaries: turn, phase, RNG, unit stats/flags,
-    positions, inventories, active regions, and visible layers. The browser
-    harness regression passes under real Chrome.
+    positions, inventories/equipment, active regions, and visible layers.
   - Parity review found and fixed weapon durability semantics in map combat,
     animation combat, and the headless solver. They now match Python LT: uses
     are lost per successful strike by default, misses only when configured, and
@@ -149,9 +178,9 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
     team state. Added Chapter 3 chest/door and Chapter 5 visit/recruitment tests.
   - Added danger-aware heal destinations, survival-frontier tuning,
     `--max-deaths`, and deterministic `--prefix` continuation. Prefix search
-    found the canonical seed-5 Chapter 5 clear: Joshua recruited, Saar defeated,
-    Village 2 visited, 4 turns/0 deaths/53 damage/65 actions. A further 150,000
-    full-root nodes (132,073 accepted; 15,075 cache hits) did not improve it.
+    found the original seed-5 Chapter 5 clear: Joshua recruited, Saar defeated,
+    Village 2 visited. Explicit equipment, shared EXP, and AI-order parity later
+    corrected its canonical metrics to 4 turns/0 deaths/71 damage/66 actions.
   - Added an all-content Chapter 5 stress fixture requiring all four villages
     and Joshua. Its verified incumbent is 5 turns/1 death/66 damage after the
     initial clear plus 210,000 continuation nodes; it remains an optimization
@@ -175,10 +204,9 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
     `verify` replays those actions instead of assuming policy weights reproduce
     a planner route. Cache keys retain exact state identity through SHA-256
     digests of canonical checkpoints.
-  - Promoted a verified fixed-seed Chapter 4 plan that keeps 22 damage/5 turns
-    while reducing total actions from 83 to 82. Two complementary 80,000-node
-    searches (6,888 and 5,043 cache hits) found no sub-22 clear; optimality is
-    not claimed.
+  - Initially promoted a verified fixed-seed Chapter 4 plan at 22 damage/5
+    turns. The current live-audited planner has since improved this to 2 damage
+    while incorporating the corrected event/recruitment lifecycle.
 
 - **Fixed-seed benchmark contract correction:**
   - Made the scenario seed part of the immutable benchmark instance; canonical
@@ -186,8 +214,8 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
   - CLI verification and continuation reject solution/scenario seed mismatches.
   - `--seed-range` now requires `--allow-seed-search` and emits a non-benchmark
     warning; seed-selected artifacts are retained only as diagnostic history.
-  - Canonical results are currently Chapter 3: 6 turns/0 deaths/19 damage and
-    Chapter 4: 5 turns/0 deaths/22 damage.
+  - Canonical results are currently Chapter 3: 6 turns/0 deaths/0 damage and
+    Chapter 4: 6 turns/0 deaths/2 damage, both on their scenario seeds.
 
 - **Generalized objectives/events + Chapter 4 rout solution:**
   - Added automatic seize/rout/defeat-boss objective inference and rout-aware
@@ -198,11 +226,12 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
   - Parallelized diagnostic seed-range scanning across worker threads in
     addition to policy hill climbing, with regression coverage against the
     sequential implementation.
-  - Added `chapter-4.json` plus a verified fixed-seed solution: seed 4 clears in
-    5 turns with 0 deaths/22 damage. Seed 211's 17-damage result is retained only
-    as explicitly non-benchmark diagnostic history.
+  - Added `chapter-4.json` plus a verified fixed-seed solution. The original
+    seed-4 22-damage route and seed-211 diagnostic have since been superseded by
+    the live-audited fixed-seed-4 2-damage route.
   - Added Chapter 4 adapter/integration tests and fixed magic-equation parity
-    discovered through Artur's intro combat.
+    discovered through Artur's intro combat. The former seed-211 17-damage
+    diagnostic is now superseded by the fixed-seed-4 2-damage canonical route.
 
 - **Deterministic headless level solver + Chapter 3 solution:**
   - Added `solver/` CLI that directly loads `.ltproj` JSON and reuses engine
@@ -214,7 +243,8 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
     diagnostic seed-range search, hill-climbing policy mutations, and worker-thread shards.
   - Added replay JSON plus standalone/inline animated map visualization output.
   - Checked in canonical `solver/solutions/chapter-3.json`: fixed seed 3,
-    6 turns, 19 player damage, 0 deaths, 10 enemies defeated, 3 walls broken.
+    now improved to 6 turns, 0 player damage, 0 deaths, 10 enemies defeated,
+    and 3 walls broken.
   - Preserved seed 115's zero-damage route only as non-benchmark diagnostic
     history in `chapter-3-seed-selected.json`.
   - Added solver unit/integration tests and a separate solver typecheck config.
@@ -291,8 +321,12 @@ query parameter. Both **chunked** (directory-per-type with `.orderkeys`) and
 
 ### Solver Next Milestones
 
-- [ ] Drive a complete saved planner route through the live browser state
+- [x] Drive a complete saved planner route through the live browser state
   machine and compare the parity snapshot after every action/phase boundary.
+- [ ] Extend the saved-route live differential audit to Chapter 5's visit and
+  Natasha-to-Joshua recruitment path, then make it a reusable scenario matrix.
+- [ ] Add an exhaustive or admissibly bounded fixed-seed proof attempt for the
+  Chapter 4 zero/one-damage frontier; the current 2-damage result is not proven.
 - [ ] Replace checkpoint restoration with compact apply/undo or copy-on-write
   state and incremental hashing; keep the checkpoint path as an oracle.
 - [ ] Add deterministic fixed-seed worker sharding across opening actions with

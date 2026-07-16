@@ -337,8 +337,20 @@ test.describe('Magic Sword Combat', () => {
     s = await getState(page);
     console.log(`After selecting Attack: ${s.currentStateName}`);
 
-    // If we're in weapon_choice, select the weapon (Light Brand should be first)
+    // If we're in weapon_choice, select Light Brand without assuming that
+    // equipping reorders inventory (Python LT keeps inventory order stable).
     if (s.currentStateName === 'weapon_choice') {
+      const lightBrandIndex = await page.evaluate(() => {
+        const eirika = (window as any).__gameRef?.units?.get?.('Eirika');
+        const weapons = eirika?.items?.filter?.(
+          (item: any) => item?.hasUsesRemaining?.() && (item?.isWeapon?.() || item?.isSpell?.()),
+        ) ?? [];
+        return weapons.findIndex((item: any) => item?.nid === 'Light_Brand');
+      });
+      expect(lightBrandIndex).toBeGreaterThanOrEqual(0);
+      for (let index = 0; index < lightBrandIndex; index++) {
+        await stepFrames(page, 3, 'DOWN');
+      }
       await stepFrames(page, 3, 'SELECT');
       await stepFrames(page, 10);
       s = await getState(page);

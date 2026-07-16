@@ -60,6 +60,24 @@ export class AIController {
   }
 
   /**
+   * Order a phase's AI units like Python LT's AIState.get_next_unit(): AI
+   * priority first, then Manhattan distance to the closest enemy, preserving
+   * insertion order for exact ties.
+   */
+  orderUnitsForTurn(units: UnitObject[]): UnitObject[] {
+    return units.map((unit, index) => ({
+      unit,
+      index,
+      priority: this.db.ai.get(unit.ai)?.priority ?? 0,
+      distance: this.distanceToClosestEnemy(unit),
+    })).sort((a, b) =>
+      b.priority - a.priority
+      || a.distance - b.distance
+      || a.index - b.index,
+    ).map((entry) => entry.unit);
+  }
+
+  /**
    * Determine the best action for an AI unit.
    * Iterates through behaviours in priority order, trying each until one succeeds.
    */
@@ -1099,6 +1117,13 @@ export class AIController {
       if (!other.position) return false;
       return !this.db.areAllied(unit.team, other.team);
     });
+  }
+
+  private distanceToClosestEnemy(unit: UnitObject): number {
+    if (!unit.position) return -1;
+    const enemies = this.getEnemies(unit);
+    if (enemies.length === 0) return -1;
+    return Math.min(...enemies.map((enemy) => this.distance(unit.position!, enemy.position!)));
   }
 
   /**

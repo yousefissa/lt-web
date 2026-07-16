@@ -21,12 +21,20 @@ test('Chapter 4 standard event adapter derives rout and both reinforcement rules
   assert.ok(plan.initialCommands.some((command) => command.nid === 'set_stats' && command.args[0] === 'Boss'));
   assert.ok(plan.initialCommands.some((command) => command.nid === 'interact_unit' && command.args[1] === 'Mogall'));
   assert.deepEqual(
-    plan.spawnRules.map((rule) => ({ group: rule.groupNid, trigger: rule.trigger })),
+    plan.spawnRules.map((rule) => ({
+      group: rule.groupNid,
+      trigger: rule.trigger,
+      onlyOnce: rule.onlyOnce,
+    })),
     [
-      { group: 'RevenantRein', trigger: { type: 'region', regionNid: 'Trigger' } },
-      { group: 'Turn2Rein', trigger: { type: 'turn', turn: 2 } },
+      { group: 'RevenantRein', trigger: { type: 'region', regionNid: 'Trigger' }, onlyOnce: false },
+      { group: 'Turn2Rein', trigger: { type: 'turn', turn: 2 }, onlyOnce: false },
     ],
   );
+  assert.deepEqual(plan.turnRules.map((rule) => rule.turn), [2, 3]);
+  assert.ok(plan.turnRules.find((rule) => rule.turn === 3)?.commands.some(
+    (command) => command.nid === 'add_unit' && command.args[0] === "L'arachel",
+  ));
 });
 
 test('Chapter 4 intro effects leave the scripted Mogall dead and boss configured', {
@@ -122,4 +130,34 @@ test('planner interactions consume unlock uses, grant rewards, and recruit direc
   assert.ok(talk);
   talkSimulator.applyPlayerAction(talk);
   assert.deepEqual(talkSimulator.getResult().interactions.recruitedUnits, ['Joshua']);
+});
+
+test('visit events can recruit and place an initially off-map unit', {
+  skip: !existsSync(projectPath),
+}, async () => {
+  const { db } = await loadSolverProject(projectPath);
+  const scenario: SolverScenario = {
+    name: 'Chapter 4 Lute recruitment fixture',
+    levelNid: '4',
+    seed: 4,
+    maxTurns: 1,
+    objective: 'rout',
+    eventAdapter: 'standard',
+    team: {
+      Vanessa: { level: 4, items: ['Slim_Lance', 'Javelin'], position: [1, 11] },
+    },
+  };
+  const simulator = new TacticalSimulator(db, scenario);
+  simulator.beginPlayerTurn();
+  const visit = simulator.enumerateLegalActions().find(
+    (action) => action.type === 'visit' && action.actor === 'Vanessa' && action.region === 'Village2',
+  );
+  assert.ok(visit);
+  simulator.applyPlayerAction(visit);
+
+  const result = simulator.getResult();
+  const lute = result.finalUnits.find((unit) => unit.nid === 'Lute');
+  assert.equal(lute?.team, 'player');
+  assert.deepEqual(lute?.position, [1, 12]);
+  assert.deepEqual(result.interactions.recruitedUnits, ['Lute']);
 });

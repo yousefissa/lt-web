@@ -3,8 +3,8 @@
 This document describes how the Lex Talionis web engine was architected
 and built across multiple AI-assisted sessions, covering the analysis strategy,
 design decisions, parallelization approach, and the full set of implemented
-systems. The engine currently spans **~43,300 lines of TypeScript across 84
-source files**.
+systems. The engine currently spans **~47,200 lines of TypeScript across 91
+source files**, plus the deterministic solver and its tests.
 
 When making modifications, you should generally plan out what to do in PLAN.md, and update what you accomplished in there. Also, make sure to keep this file up to date with the architecture of the project.
 
@@ -438,17 +438,21 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
 - **Event adapter**: Infers seize/rout objectives and applies common level-start
   unit/group/stat/tag/scripted-combat effects plus turn/region group
   reinforcements. It also derives visits, directional talks/recruitment,
-  doors/chests, unlock consumption/rewards, and destructible-region AI effects.
+  doors/chests, unlock consumption/rewards, destructible-region AI effects,
+  repeatable turn/region triggers, and off-map recruit placement.
 - **Search**: Deterministic fixed-seed hill climbing with multi-core policy
   shards plus action-level beam search with bounded per-actor branching,
   objective/damage frontier diversity, protected incumbent prefixes,
   irreversible incumbent bounds, and a SHA-256 future-state transposition table
   with Pareto death/damage/action labels. Lexicographic scoring requires a clear before
   deaths, damage, turns, and action count are minimized. Seed scans are gated as
-  non-benchmark diagnostics.
+  non-benchmark diagnostics. `--policy` imports heuristic weights without
+  trusting stale artifacts, while `refresh` replays every saved action before
+  migrating a route to a current benchmark fingerprint.
 - **Planner state**: Versioned checkpoints and independent clones preserve RNG,
   turn/event lifecycle, metrics, unit flags/stats/positions, inventories/uses,
-  active regions/layers/interactions, and replay state. Legal player actions are
+  explicit equipment, active regions/layers/interactions, off-map level units,
+  and replay state. Legal player actions are
   enumerable and validated one at a time, with deterministic enemy/other phase
   stepping and cache-stable keys. Search supports zero-death pruning and exact
   action-prefix continuation. Beam nodes store checkpoints and reuse a simulator
@@ -461,19 +465,23 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
   continuation, and prefixes reject missing or mismatched fingerprints.
 - **Parity audit**: Solver and live browser harness expose a shared normalized
   action-boundary snapshot plus field-level diffs for RNG, phases, units,
-  inventories, regions, and layers. Combat durability uses shared Python-LT
-  hit/miss/one-loss-per-combat semantics in solver and both visual combat paths.
+  inventories/equipment, regions, and layers. The saved Chapter 4 route is
+  replayed through live attacks, heals, moves, waits, visits, talks, doors,
+  chests, and phase transitions. Combat durability and combat EXP use shared
+  semantics in the solver and both visual combat paths.
 - **Replay**: Every action records a state snapshot for JSON verification and an
   interactive grid animation
-- **Chapter 3 result**: Canonical fixed seed 3 route clears in 6 turns with zero
-  deaths and 19 damage; this is best-found, not a proof of turn optimality
+- **Chapter 3 result**: Canonical fixed seed 3 route clears in 6 turns/73
+  actions with zero deaths and zero damage; this is best-found, not a proof.
 - **Chapter 4 result**: Canonical fixed seed 4 explicit plan clears the
-  event-derived rout objective in 5 turns/82 total actions with zero deaths and
-  22 damage, including Turn 2 and lower-map trigger reinforcements. Two
-  80,000-node beam configurations did not find sub-22; this is not a proof.
+  event-derived rout objective in 6 turns/90 total actions (49 player actions)
+  with zero deaths and 2 damage. It includes both villages, Lute recruitment,
+  Turn 2/3 events, and lower-map trigger reinforcements. A 26,044-node <=1
+  frontier found no improvement; this is not an optimality proof.
 - **Chapter 5 result**: Canonical fixed seed 5 explicit plan recruits Joshua,
-  visits Village 2, and defeats Saar in 4 turns/65 actions with zero deaths and
-  53 damage. The all-four-villages stress fixture has a separate verified
+  visits Village 2, and defeats Saar in 4 turns/66 actions with zero deaths and
+  71 damage under corrected equipment/EXP/AI semantics. A 22,383-node <=70
+  challenge found no improvement. The all-four-villages stress fixture has a separate verified
   5-turn/1-death/66-damage incumbent.
 
 ---
@@ -490,18 +498,18 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
 | `cursor.ts` | ~194 | Tile-grid cursor with sprite animation |
 | `initiative.ts` | ~210 | Initiative-based turn system tracker |
 | `difficulty.ts` | ~135 | Difficulty mode runtime class |
-| `save.ts` | ~1474 | IndexedDB save/load with full serialization |
+| `save.ts` | ~1442 | IndexedDB save/load with full serialization, including equipment |
 | `records.ts` | ~903 | Recordkeeper, persistent records, achievements |
 | `query-engine.ts` | ~874 | 28 Python-compatible query functions |
 | `support-system.ts` | ~500 | Support pairs, ranks, affinity bonuses |
 | `line-of-sight.ts` | ~170 | Bresenham LOS for fog of war |
 | `perf-monitor.ts` | ~440 | Frame budget monitor, profiling |
-| `parity.ts` | ~77 | Renderer-independent solver/live-engine state snapshots and diffs |
+| `parity.ts` | ~78 | Renderer-independent solver/live-engine state snapshots and diffs |
 
 ### Game States (`src/engine/states/`)
 | File | Lines | Purpose |
 |------|------:|---------|
-| `game-states.ts` | ~8050 | 21+ states, ~84 event commands, all gameplay logic |
+| `game-states.ts` | ~9230 | 21+ states, ~100 event commands, all gameplay logic |
 | `prep-state.ts` | ~499 | GBA-style preparation screen |
 | `base-state.ts` | ~510 | Base screen hub menu |
 | `settings-state.ts` | ~621 | Settings menu (Config/Controls) |
@@ -519,6 +527,7 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
 | `combat-calcs.ts` | ~722 | Hit, damage, crit, avoid, weapon triangle, component dispatch |
 | `combat-solver.ts` | ~409 | Strike sequencing, vantage/desperation/miracle |
 | `combat-uses.ts` | ~33 | Shared LT durability consumption for solver/map/animation combat |
+| `combat-exp.ts` | ~45 | Shared combat EXP and deterministic level-up rolls |
 | `animation-combat.ts` | ~1078 | GBA-style animation combat state machine |
 | `battle-animation.ts` | ~763 | Frame-by-frame pose playback |
 | `map-combat.ts` | ~555 | Map-mode combat (no animations) |
@@ -555,7 +564,7 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
 ### AI (`src/ai/`)
 | File | Lines | Purpose |
 |------|------:|---------|
-| `ai-controller.ts` | ~1195 | Full AI: behaviours, targeting, healing, group activation |
+| `ai-controller.ts` | ~1227 | Full AI plus Python-LT phase unit ordering |
 
 ### UI (`src/ui/`)
 | File | Lines | Purpose |
@@ -577,11 +586,11 @@ The event system supports both semicolon-delimited (EVNT) and Python-syntax
 ### Solver (`solver/`)
 | File | Purpose |
 |------|---------|
-| `cli.ts` | `inspect`/`run`/`solve`/`plan`/`prove`/`verify` command interface |
+| `cli.ts` | `inspect`/`run`/`solve`/`plan`/`prove`/`verify`/`refresh` command interface |
 | `benchmark.ts` | Scenario/project/engine benchmark fingerprinting |
 | `project-loader.ts` | Filesystem `.ltproj` adapter for the engine database |
 | `event-adapter.ts` | Objective inference and standard LT event effect derivation |
-| `simulator.ts` | Fast tactical runner, cloneable checkpoints, legal actions, deterministic phase stepping, policy evaluation, and replay capture |
+| `simulator.ts` | Fast tactical runner, cloneable checkpoints, legal actions, off-map/event lifecycle, deterministic phase stepping, policy evaluation, and replay capture |
 | `beam-search.ts` | Fixed-seed action beam, incumbent protection, transposition cache, and explicit plan replay |
 | `proof-search.ts` | Exhaustive bounded fixed-seed feasibility search with honest proof status |
 | `transposition.ts` | Pareto dominance table for exact future-state hashes |

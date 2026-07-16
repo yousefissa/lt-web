@@ -2258,12 +2258,7 @@ export class WeaponChoiceState extends State {
   }
 
   private equipWeapon(unit: UnitObject, weapon: ItemObject): void {
-    // Move the weapon to the front of inventory (equip it)
-    const idx = unit.items.indexOf(weapon);
-    if (idx > 0) {
-      unit.items.splice(idx, 1);
-      unit.items.unshift(weapon);
-    }
+    unit.equipWeapon(weapon);
   }
 
   private showWeaponRange(unit: UnitObject, weapon: ItemObject): void {
@@ -4025,9 +4020,10 @@ export class AIState extends MapState {
     } else {
       // Standard mode: gather all units for the current team
       const currentTeam = game.phase.getCurrent();
-      this.aiUnits = game.board
-        .getTeamUnits(currentTeam)
-        .filter((u: UnitObject) => !u.isDead() && u.canStillAct() && game.isAiGroupActive(u.aiGroup));
+      const candidates = (Array.from(game.units.values()) as UnitObject[])
+        .filter((u) => u.team === currentTeam && !!u.position
+          && !u.isDead() && u.canStillAct() && game.isAiGroupActive(u.aiGroup));
+      this.aiUnits = game.aiController.orderUnitsForTurn(candidates);
     }
 
     this.currentAiIndex = 0;
@@ -4431,15 +4427,9 @@ export class AIState extends MapState {
   ): void {
     const game = getGame();
 
-    // Equip the AI's chosen weapon by moving it to the front of inventory.
-    // CombatState.begin() calls getEquippedWeapon() which returns the first
-    // weapon in the unit's inventory, so we must ensure the chosen weapon
-    // is at the front. Matches Python's action.EquipItem in ai_controller.py.
-    const weaponIdx = attacker.items.indexOf(weapon);
-    if (weaponIdx > 0) {
-      attacker.items.splice(weaponIdx, 1);
-      attacker.items.unshift(weapon);
-    }
+    // Persist the AI's selected weapon without reordering inventory, matching
+    // Python LT's EquipItem action.
+    attacker.equipWeapon(weapon);
 
     // CombatState.begin() reads these to set up the MapCombat instance
     game.selectedUnit = attacker;
@@ -6418,9 +6408,8 @@ export class EventState extends State {
         // add_unit;unit_nid;x,y  or  add_unit;unit_nid;starting
         const unitNid = args[0] ?? '';
         const posArg = args[1] ?? 'starting';
-
-        // Skip if unit already exists in the game
-        if (game.units.has(unitNid)) {
+        const existingUnit = game.units.get(unitNid) as UnitObject | undefined;
+        if (existingUnit?.position || existingUnit?.isDead()) {
           this.advancePointer();
           return false;
         }
@@ -6444,8 +6433,27 @@ export class EventState extends State {
           }
         }
 
-        // Spawn the unit — handle both unique and generic
-        this.spawnUnitFromLevelData(unitData, posOverride, game);
+        const desiredPosition = posOverride
+          ?? existingUnit?.startingPosition
+          ?? unitData.starting_position
+          ?? null;
+        const placement = (args[3] ?? 'giveup').toLowerCase().trim();
+        const finalPosition = desiredPosition
+          ? this._checkPlacement(desiredPosition, placement, game)
+          : null;
+        if (!finalPosition) {
+          console.warn(`EventState add_unit: no valid position for "${unitNid}"`);
+          this.advancePointer();
+          return false;
+        }
+
+        if (existingUnit) {
+          game.board?.setUnit(finalPosition[0], finalPosition[1], existingUnit);
+          if (game.initiative) game.initiative.insertUnit(existingUnit, game.db);
+        } else {
+          // Spawn the unit — handle both unique and generic
+          this.spawnUnitFromLevelData(unitData, finalPosition, game);
+        }
 
         this.advancePointer();
         return false;
@@ -8208,8 +8216,8 @@ export class EventState extends State {
 
         if (iuImmediate) {
           // Immediate mode: resolve combat without visual animation
-          const attackItem = iuAttacker.items.find((i: ItemObject) => i.isWeapon());
-          const defItem = iuDefender.items.find((i: ItemObject) => i.isWeapon()) ?? null;
+          const attackItem = iuAttacker.getEquippedWeapon();
+          const defItem = iuDefender.getEquippedWeapon();
           if (attackItem) {
             const rngMode2 = game.db.getConstant('rng_mode', 'true_hit') as any;
             const mc = new MapCombat(

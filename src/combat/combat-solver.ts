@@ -115,7 +115,7 @@ export class CombatPhaseSolver {
     token: string,
     board?: GameBoard | null,
   ): CombatStrike {
-    const defWeapon = target.items.find((i) => i.isWeapon()) ?? null;
+    const defWeapon = target.getEquippedWeapon();
     const wt = calcs.weaponTriangle(item, defWeapon, db, striker);
 
     const isMiss = token.startsWith('miss');
@@ -364,7 +364,7 @@ export class CombatPhaseSolver {
     board?: GameBoard | null,
   ): CombatStrike {
     // Compute hit chance with weapon triangle bonus
-    const defWeapon = target.items.find((i) => i.isWeapon()) ?? null;
+    const defWeapon = target.getEquippedWeapon();
     const baseHit = calcs.computeHit(striker, item, target, db, board);
     const wt = calcs.weaponTriangle(item, defWeapon, db, striker);
     const finalHit = Math.max(0, Math.min(100, baseHit + wt.hitBonus));

@@ -5,6 +5,7 @@ import type { GameBoard } from '../objects/game-board';
 import type { CombatStrike } from './combat-solver';
 import { CombatPhaseSolver, type RngMode } from './combat-solver';
 import { consumeCombatItemUses } from './combat-uses';
+import { grantCombatExperience } from './combat-exp';
 
 // ============================================================
 // MapCombat - Manages the visual presentation of combat on the
@@ -260,21 +261,13 @@ export class MapCombat {
       defenseWeaponBroke = consumeCombatItemUses(this.defender, this.defenseItem, this.strikes);
     }
 
-    // Calculate EXP
-    const expGained = this.calculateExp(attackerDead, defenderDead);
-
-    // Grant EXP and perform level-ups with growth rolls
-    let levelUps: Record<string, number>[] = [];
-    const growthMode = (this.db.getConstant('growths_choice', 'random') as string) || 'random';
-
-    if (!attackerDead && this.attacker.team === 'player' && expGained > 0) {
-      this.attacker.exp += expGained;
-      while (this.attacker.exp >= 100) {
-        this.attacker.exp -= 100;
-        const gains = this.attacker.levelUp(growthMode);
-        levelUps.push(gains);
-      }
-    }
+    const { expGained, levelUps } = grantCombatExperience(
+      this.attacker,
+      this.defender,
+      attackerDead,
+      defenderDead,
+      this.db,
+    );
 
     // Check for droppable items from dead defender
     let droppedItem: import('../objects/item').ItemObject | null = null;
@@ -530,35 +523,6 @@ export class MapCombat {
     this.damagePopups = this.damagePopups.filter(p => p.elapsed < p.duration);
   }
 
-  // ------------------------------------------------------------------
-  // EXP calculation
-  // ------------------------------------------------------------------
-
-  /**
-   * Calculate experience gained.
-   * Base 30 exp for combat, +50 bonus for kill.
-   * Scaled by level difference between attacker and defender.
-   */
-  private calculateExp(attackerDead: boolean, defenderDead: boolean): number {
-    if (attackerDead) return 0;
-
-    const BASE_EXP = 30;
-    const KILL_BONUS = 50;
-
-    // Level difference scaling: higher-level enemies give more exp
-    const levelDiff = this.defender.level - this.attacker.level;
-    // Scale factor: +/- 5 exp per level difference, clamped so exp doesn't go negative
-    const levelScale = Math.max(0.1, 1 + levelDiff * 0.1);
-
-    let exp = Math.round(BASE_EXP * levelScale);
-
-    if (defenderDead) {
-      exp += Math.round(KILL_BONUS * levelScale);
-    }
-
-    // Clamp to 1..100
-    return Math.max(1, Math.min(100, exp));
-  }
 }
 
 // ------------------------------------------------------------------

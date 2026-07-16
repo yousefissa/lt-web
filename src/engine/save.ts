@@ -43,6 +43,7 @@ export interface UnitSaveData {
   growths: Record<string, number>;
   maxStats: Record<string, number>;
   items: string[];        // item key references into items map
+  equippedItemIndex?: number | null;
   skills: string[];       // skill NIDs
   tags: string[];
   ai: string;
@@ -356,6 +357,7 @@ function serializeUnit(unit: UnitObject): UnitSaveData {
     growths: { ...unit.growths },
     maxStats: { ...unit.maxStats },
     items: itemKeys,
+    equippedItemIndex: unit.equippedWeapon ? unit.items.indexOf(unit.equippedWeapon) : null,
     skills: skillNids,
     tags: [...unit.tags],
     ai: unit.ai,
@@ -889,6 +891,11 @@ async function restoreGameState(game: any, s: SaveDict): Promise<void> {
           console.warn(`Unit "${unitData.nid}": item key "${itemKey}" not found in restored items`);
         }
       }
+      unit.equippedWeapon = unitData.equippedItemIndex === undefined
+        ? unit.getEquippedWeapon()
+        : unitData.equippedItemIndex === null
+          ? null
+          : unit.items[unitData.equippedItemIndex] ?? null;
 
       // Restore skills
       unit.skills = [];

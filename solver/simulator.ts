@@ -13,6 +13,7 @@ import {
   type RngMode,
 } from '../src/combat/combat-solver';
 import { consumeCombatItemUses } from '../src/combat/combat-uses';
+import { grantCombatExperience } from '../src/combat/combat-exp';
 import type { Database } from '../src/data/database';
 import type {
   GenericUnitData,
@@ -39,6 +40,7 @@ import {
   resolveGroupPosition,
   type EventInteractionRule,
   type EventGroupSpawnRule,
+  type EventTurnRule,
   type ParsedEventCommand,
 } from './event-adapter';
 import type {
@@ -180,6 +182,7 @@ export class TacticalSimulator {
   private lost: boolean;
   private dangerMoveCache: Map<string, Position[]>;
   private eventSpawnRules: EventGroupSpawnRule[];
+  private eventTurnRules: EventTurnRule[];
   private firedEventRules: Set<string>;
   private playerPhasePrepared: boolean;
   private interactionRules: EventInteractionRule[];
@@ -224,6 +227,7 @@ export class TacticalSimulator {
     this.lost = false;
     this.dangerMoveCache = new Map();
     this.eventSpawnRules = scenario.eventAdapter === 'standard' ? eventPlan.spawnRules : [];
+    this.eventTurnRules = scenario.eventAdapter === 'standard' ? eventPlan.turnRules : [];
     this.firedEventRules = new Set();
     this.playerPhasePrepared = false;
     this.interactionRules = scenario.eventAdapter === 'standard' ? eventPlan.interactionRules : [];
@@ -649,7 +653,15 @@ export class TacticalSimulator {
       || action.type === 'chest' || action.type === 'door') {
       this.executePlayerInteraction(unit, action);
     } else {
-      const item = action.itemIndex === undefined ? undefined : unit.items[action.itemIndex];
+      // Planner actions retain the inventory slot that disambiguated duplicate
+      // copies when they were enumerated. Equipping a weapon is persistent in
+      // the live engine, however, so an older continuation can legitimately
+      // move that NID to another slot before its next use. Prefer the exact
+      // slot and fall back to the uniquely named item for route migration.
+      const indexedItem = action.itemIndex === undefined ? undefined : unit.items[action.itemIndex];
+      const item = indexedItem?.nid === action.item
+        ? indexedItem
+        : unit.items.find((candidate) => candidate.nid === action.item);
       const target = action.target ? this.units.get(action.target) : undefined;
       if (!item || item.nid !== action.item || !item.hasUsesRemaining() || !target?.position || target.isDead()) {
         throw new Error(`Invalid ${action.type} target or item for ${action.actor}`);
@@ -864,6 +876,7 @@ export class TacticalSimulator {
         hasTraded: unit.hasTraded,
         finished: unit.finished,
         items: unit.items.map((item) => ({ nid: item.nid, uses: item.uses })),
+        equippedItemIndex: unit.equippedWeapon ? unit.items.indexOf(unit.equippedWeapon) : null,
       })).sort((a, b) => a.nid.localeCompare(b.nid)),
       activeRegions: Array.from(this.activeRegions).sort(),
       visibleLayers: Array.from(this.visibleLayers).sort(),
@@ -886,11 +899,8 @@ export class TacticalSimulator {
   }
 
   private spawnInitialUnits(): void {
-    const scripted = new Set((this.scenario.scriptedSpawns ?? []).map((spawn) => spawn.unitNid));
     for (const data of this.level.units) {
-      if (!data.starting_position && scripted.has(data.nid)) continue;
       if (data.team === 'player' && this.scenario.team[data.nid]?.enabled === false) continue;
-      if (!data.starting_position) continue;
       this.spawnLevelUnit(data, data.team, data.starting_position);
     }
   }
@@ -910,12 +920,17 @@ export class TacticalSimulator {
         const position = clonePosition(config.position) ?? formations.shift() ?? null;
         if (!position) throw new Error(`Configured team unit ${nid} needs a position or free formation slot`);
         unit = this.spawnFromPrefab(prefab, 'player', position, 'None', config) ?? undefined;
-      } else if (unit.team === 'player' && config.position) {
-        const occupant = this.board.getUnit(config.position[0], config.position[1]);
+      } else {
+        unit.team = 'player';
+        unit.ai = 'None';
+        const position = clonePosition(config.position) ?? (!unit.position ? formations.shift() ?? null : null);
+        if (!position) continue;
+        const occupant = this.board.getUnit(position[0], position[1]);
         if (occupant && occupant !== unit) {
-          throw new Error(`Configured position ${config.position.join(',')} is occupied by ${occupant.nid}`);
+          throw new Error(`Configured position ${position.join(',')} is occupied by ${occupant.nid}`);
         }
-        this.board.moveUnit(unit, config.position[0], config.position[1]);
+        if (unit.position) this.board.moveUnit(unit, position[0], position[1]);
+        else this.board.setUnit(position[0], position[1], unit);
       }
     }
   }
@@ -1011,9 +1026,9 @@ export class TacticalSimulator {
     const defender = targetPosition
       ? this.board.getUnit(targetPosition[0], targetPosition[1])
       : this.units.get(targetValue);
-    const attackItem = attacker?.items.find((item) => item.isWeapon() && item.hasUsesRemaining());
+    const attackItem = attacker?.getEquippedWeapon();
     if (!attacker || !defender || !attackItem || !encodedScript) return;
-    const defenseItem = defender.items.find((item) => item.isWeapon() && item.hasUsesRemaining()) ?? null;
+    const defenseItem = defender.getEquippedWeapon();
     const strikes = this.combatSolver.resolve(
       attacker,
       attackItem,
@@ -1105,6 +1120,7 @@ export class TacticalSimulator {
       item.owner = unit;
       unit.items.push(item);
     }
+    unit.getEquippedWeapon();
 
     const learned = [...(prefab.learned_skills ?? []), ...(klass.learned_skills ?? [])];
     for (const [requiredLevel, nid] of learned) {
@@ -1165,25 +1181,60 @@ export class TacticalSimulator {
   private runAiPhase(phase: 'enemy' | 'other'): void {
     this.currentPhase = phase;
     this.syncAiRegions();
-    const units = this.unitsByTeam(phase)
-      .filter((unit) => unit.position && !unit.isDead())
-      .sort((a, b) => (this.db.ai.get(b.ai)?.priority ?? 0) - (this.db.ai.get(a.ai)?.priority ?? 0));
+    const units = this.aiController.orderUnitsForTurn(
+      this.unitsByTeam(phase).filter((unit) => unit.position && !unit.isDead()),
+    );
     for (const unit of units) unit.resetTurnState();
 
     for (const unit of units) {
       if (!unit.position || unit.isDead() || this.cleared || this.lost) continue;
       const action = this.aiController.getAction(unit);
       this.executeAiAction(action);
-      unit.finished = true;
+      if (!unit.isDead()) unit.finished = true;
       this.refreshOutcome();
     }
   }
 
   private runEventSpawns(): void {
-    for (const rule of this.eventSpawnRules) {
-      if (this.firedEventRules.has(rule.id) || !this.eventSpawnRuleMatches(rule)) continue;
+    for (const rule of this.eventTurnRules) {
+      if (this.firedEventRules.has(rule.id) || rule.turn !== this.currentTurn) continue;
       this.firedEventRules.add(rule.id);
+      this.applyTurnEventCommands(rule.commands);
+    }
+    for (const rule of this.eventSpawnRules) {
+      if ((rule.onlyOnce && this.firedEventRules.has(rule.id)) || !this.eventSpawnRuleMatches(rule)) continue;
+      if (rule.onlyOnce) this.firedEventRules.add(rule.id);
       this.placeGroup(rule.groupNid, rule.startingGroup, true, true);
+    }
+  }
+
+  private applyTurnEventCommands(commands: ParsedEventCommand[]): void {
+    for (const command of commands) {
+      const [first, second] = command.args;
+      if (command.nid === 'add_unit') {
+        this.placeUnit(first, parsePosition(second), true);
+      } else if (command.nid === 'move_unit') {
+        this.placeUnit(first, parsePosition(second), false);
+      } else if (command.nid === 'remove_unit') {
+        const unit = this.units.get(first);
+        if (unit) this.board.removeUnit(unit);
+        this.units.delete(first);
+      } else if (command.nid === 'kill_unit') {
+        const unit = this.units.get(first);
+        if (unit) this.killUnit(unit);
+      } else if (command.nid === 'change_ai') {
+        const unit = this.units.get(first);
+        if (unit && second) unit.ai = second;
+      } else if (command.nid === 'change_team') {
+        const unit = this.units.get(first);
+        if (unit && second) unit.team = second;
+      } else if (command.nid === 'show_layer') {
+        this.setLayerVisibility(first, true);
+      } else if (command.nid === 'hide_layer') {
+        this.setLayerVisibility(first, false);
+      } else if (command.nid === 'remove_region') {
+        this.activeRegions.delete(first);
+      }
     }
   }
 
@@ -1203,12 +1254,13 @@ export class TacticalSimulator {
 
   private runScriptedSpawns(phase: SolverPhase): void {
     const spawns = (this.scenario.scriptedSpawns ?? []).filter(
-      (spawn) => spawn.turn === this.currentTurn && spawn.phase === phase && !this.units.has(spawn.unitNid),
+      (spawn) => spawn.turn === this.currentTurn && spawn.phase === phase
+        && !this.units.get(spawn.unitNid)?.position,
     );
     for (const spawn of spawns) {
-      const levelData = this.level.units.find((unit) => unit.nid === spawn.unitNid);
-      if (!levelData) continue;
-      const unit = this.spawnLevelUnit(levelData, spawn.team, spawn.position);
+      const existing = this.units.get(spawn.unitNid);
+      if (existing) existing.team = spawn.team;
+      const unit = this.placeUnit(spawn.unitNid, spawn.position, true);
       if (!unit) continue;
       if (spawn.moveTo && !this.board.isOccupied(spawn.moveTo[0], spawn.moveTo[1])) {
         this.board.moveUnit(unit, spawn.moveTo[0], spawn.moveTo[1]);
@@ -1219,10 +1271,12 @@ export class TacticalSimulator {
 
   private executeAiAction(action: AIAction): void {
     const unit = action.unit;
+    const origin = clonePosition(unit.position);
     const destination = action.targetPosition ?? unit.position;
     if (destination && (!this.board.isOccupied(destination[0], destination[1]) || unit.position?.toString() === destination.toString())) {
       this.board.moveUnit(unit, destination[0], destination[1]);
     }
+    unit.hasMoved = !!origin && !!destination && !samePosition(origin, destination);
 
     if (action.type === 'interact' && action.regionNid && this.activeRegions.has(action.regionNid)) {
       const rule = this.interactionRules.find(
@@ -1233,6 +1287,7 @@ export class TacticalSimulator {
       const region = this.level.regions.find((candidate) => candidate.nid === action.regionNid);
       if (rule && region) {
         this.executeInteractionRule(rule, unit, region);
+        if (!unit.isDead()) unit.hasAttacked = true;
         this.metrics.actions++;
         this.recordStep('interact', `${unit.name} interacts with ${region.nid}`, unit, unit.position);
         return;
@@ -1251,6 +1306,7 @@ export class TacticalSimulator {
         this.recordStep('heal', `${unit.name} heals ${action.targetUnit.name} for ${amount}`, unit, unit.position, action.targetUnit, action.item);
       } else {
         this.executeCombat(unit, action.targetUnit, action.item);
+        if (!unit.isDead()) unit.hasAttacked = true;
       }
       return;
     }
@@ -1299,7 +1355,7 @@ export class TacticalSimulator {
     if (!original) return -Infinity;
     this.board.moveUnit(unit, position[0], position[1]);
 
-    const defenderWeapon = target.items.find((candidate) => candidate.isWeapon()) ?? null;
+    const defenderWeapon = target.getEquippedWeapon();
     const triangle = weaponTriangle(item, defenderWeapon, this.db, unit);
     const hit = Math.max(0, Math.min(100, computeHit(unit, item, target, this.db, this.board) + triangle.hitBonus));
     const perHit = Math.max(0, computeDamage(unit, item, target, this.db, this.board) + triangle.damageBonus);
@@ -1387,12 +1443,17 @@ export class TacticalSimulator {
     this.board.moveUnit(unit, position[0], position[1]);
     unit.hasMoved = from?.[0] !== position[0] || from?.[1] !== position[1];
     this.executeCombat(unit, target, item, from);
-    unit.hasAttacked = true;
-    unit.finished = true;
+    if (!unit.isDead()) {
+      unit.hasAttacked = true;
+      unit.finished = true;
+    }
   }
 
   private executeCombat(unit: UnitObject, target: UnitObject, item: ItemObject, from?: Position | null): void {
-    const defenseItem = target.items.find((candidate) => candidate.isWeapon() && candidate.hasUsesRemaining()) ?? null;
+    // LT equipment is explicit and does not reorder inventory. Persist the
+    // selected weapon so future enemy-phase counters use the same equipment.
+    unit.equipWeapon(item);
+    const defenseItem = target.getEquippedWeapon();
     const strikes = this.combatSolver.resolve(unit, item, target, defenseItem, this.db, this.rngMode, this.board);
     const records: StrikeRecord[] = [];
     for (const strike of strikes) {
@@ -1401,6 +1462,14 @@ export class TacticalSimulator {
     const usedItems = new Map<ItemObject, UnitObject>();
     for (const strike of strikes) usedItems.set(strike.item, strike.attacker);
     for (const [usedItem, owner] of usedItems) consumeCombatItemUses(owner, usedItem, strikes);
+    grantCombatExperience(
+      unit,
+      target,
+      unit.isDead(),
+      target.isDead(),
+      this.db,
+      () => this.rng.next(),
+    );
     this.metrics.actions++;
     this.metrics.combats++;
     const summary = records.map((strike) => `${strike.attacker}${strike.hit ? ` ${strike.damage}` : ' miss'}${strike.crit ? ' crit' : ''}`).join(', ');
@@ -1439,6 +1508,7 @@ export class TacticalSimulator {
   private executeHeal(candidate: HealCandidate): void {
     const from = clonePosition(candidate.unit.position);
     this.board.moveUnit(candidate.unit, candidate.position[0], candidate.position[1]);
+    candidate.unit.hasMoved = !!from && !samePosition(from, candidate.position);
     const before = candidate.target.currentHp;
     candidate.target.currentHp = Math.min(candidate.target.maxHp, before + candidate.amount);
     const healed = candidate.target.currentHp - before;
@@ -1537,10 +1607,22 @@ export class TacticalSimulator {
       const index = recipient.items.findIndex((item) => item.nid === second);
       if (index >= 0) recipient.items.splice(index, 1);
     } else if (command.nid === 'change_team') {
-      const unit = this.units.get(first);
-      if (!unit || !second) return;
+      if (!second) return;
+      let unit = this.units.get(first);
+      if (!unit) {
+        const data = this.level.units.find((candidate) => candidate.nid === first);
+        if (data) unit = this.spawnLevelUnit(data, second, null) ?? undefined;
+      }
+      if (!unit) return;
       unit.team = second;
       if (unit.position) this.board.moveUnit(unit, unit.position[0], unit.position[1]);
+    } else if (command.nid === 'add_unit') {
+      this.placeUnit(first, parsePosition(second), true);
+    } else if (command.nid === 'move_unit') {
+      this.placeUnit(first, parsePosition(second), false);
+    } else if (command.nid === 'remove_unit') {
+      const unit = this.units.get(first);
+      if (unit) this.board.removeUnit(unit);
     } else if (command.nid === 'change_ai') {
       const unit = this.units.get(first);
       if (unit && second) unit.ai = second;
@@ -1575,10 +1657,10 @@ export class TacticalSimulator {
       (candidate) => candidate.isWeapon() && distance >= candidate.getMinRange() && distance <= candidate.getMaxRange(),
     );
     if (!item) return 0;
-    const triangle = weaponTriangle(item, defender.items.find((candidate) => candidate.isWeapon()) ?? null, this.db, attacker);
+    const triangle = weaponTriangle(item, defender.getEquippedWeapon(), this.db, attacker);
     const hit = Math.max(0, Math.min(100, computeHit(attacker, item, defender, this.db, this.board) + triangle.hitBonus));
     const damage = Math.max(0, computeDamage(attacker, item, defender, this.db, this.board) + triangle.damageBonus);
-    const doubles = canDouble(attacker, item, defender, defender.items.find((candidate) => candidate.isWeapon()) ?? null, this.db) ? 2 : 1;
+    const doubles = canDouble(attacker, item, defender, defender.getEquippedWeapon(), this.db) ? 2 : 1;
     return (hit / 100) * damage * doubles;
   }
 
@@ -1598,10 +1680,10 @@ export class TacticalSimulator {
           const distance = manhattan(position, unit.position!);
           return distance >= item.getMinRange() && distance <= item.getMaxRange();
         })) continue;
-        const triangle = weaponTriangle(item, unit.items.find((candidate) => candidate.isWeapon()) ?? null, this.db, enemy);
+        const triangle = weaponTriangle(item, unit.getEquippedWeapon(), this.db, enemy);
         const hit = Math.max(0, Math.min(100, computeHit(enemy, item, unit, this.db, this.board) + triangle.hitBonus));
         const damage = Math.max(0, computeDamage(enemy, item, unit, this.db, this.board) + triangle.damageBonus);
-        const doubles = canDouble(enemy, item, unit, unit.items.find((candidate) => candidate.isWeapon()) ?? null, this.db) ? 2 : 1;
+        const doubles = canDouble(enemy, item, unit, unit.getEquippedWeapon(), this.db) ? 2 : 1;
         best = Math.max(best, (hit / 100) * damage * doubles);
       }
       danger += best;
@@ -1854,6 +1936,7 @@ export class TacticalSimulator {
         uses: item.uses,
         droppable: item.droppable,
       })),
+      equippedItemIndex: unit.equippedWeapon ? unit.items.indexOf(unit.equippedWeapon) : null,
       hasAttacked: unit.hasAttacked,
       hasMoved: unit.hasMoved,
       hasTraded: unit.hasTraded,
@@ -1893,6 +1976,9 @@ export class TacticalSimulator {
       item.droppable = savedItem.droppable;
       return item;
     });
+    unit.equippedWeapon = saved.equippedItemIndex === null
+      ? null
+      : unit.items[saved.equippedItemIndex] ?? null;
     unit.hasAttacked = saved.hasAttacked;
     unit.hasMoved = saved.hasMoved;
     unit.hasTraded = saved.hasTraded;

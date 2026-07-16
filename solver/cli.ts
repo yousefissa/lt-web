@@ -44,6 +44,7 @@ interface CliOptions {
   htmlPath?: string;
   fragmentPath?: string;
   solutionPath?: string;
+  policyPath?: string;
   prefixPath?: string;
   json: boolean;
 }
@@ -97,11 +98,39 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (options.command === 'refresh') {
+    if (!options.solutionPath) throw new Error('refresh requires --solution <path>');
+    if (!options.solutionOutputPath) throw new Error('refresh requires --solution-out <path>');
+    const saved = JSON.parse(await readFile(path.resolve(options.solutionPath), 'utf8')) as SolverResult;
+    assertFixedSeed(scenario.seed, saved.seed, options);
+    if (saved.levelNid !== scenario.levelNid) {
+      throw new Error(`Level mismatch: scenario is ${scenario.levelNid}, saved route is ${saved.levelNid}`);
+    }
+    if (!saved.plan?.length) throw new Error(`Saved artifact ${options.solutionPath} does not contain a plan`);
+    console.error(
+      `refreshing ${saved.plan.length} fixed-seed actions from ${options.solutionPath}; `
+      + 'saved metrics and benchmark fingerprints are ignored',
+    );
+    const refreshed = replayPlannedSolution(db, scenario, saved.policy, saved.plan);
+    if (!refreshed.metrics.cleared) {
+      throw new Error(`Refreshed route no longer clears: score [${refreshed.score.join(', ')}]`);
+    }
+    refreshed.benchmark = benchmark;
+    if (options.outputPath) await writeJson(options.outputPath, refreshed);
+    await writeSolution(options.solutionOutputPath, refreshed);
+    if (options.htmlPath) await writeReplayHtml(options.htmlPath, refreshed);
+    if (options.fragmentPath) await writeReplayFragment(options.fragmentPath, refreshed);
+    console.log(options.json ? JSON.stringify(refreshed, null, 2) : formatSummary(refreshed));
+    console.log('refresh: every saved action replayed against the current fixed-seed benchmark');
+    return;
+  }
+
   if (options.command === 'prove') {
     if (options.allowSeedSearch || options.seedRange || options.seed !== undefined) {
       throw new Error('prove searches exactly the scenario seed; seed overrides and seed search are not supported');
     }
     let policy: PolicyWeights = DEFAULT_POLICY;
+    if (options.policyPath) policy = await readPolicy(options.policyPath);
     if (options.solutionPath) {
       const saved = JSON.parse(await readFile(path.resolve(options.solutionPath), 'utf8')) as SolverResult;
       assertFixedSeed(scenario.seed, saved.seed, options);
@@ -146,6 +175,7 @@ async function main(): Promise<void> {
     let startingPolicy: PolicyWeights = DEFAULT_POLICY;
     let startingSolution: SolverResult | undefined;
     let prefix: PlannerAction[] = [];
+    if (options.policyPath) startingPolicy = await readPolicy(options.policyPath);
     if (options.solutionPath) {
       const saved = JSON.parse(await readFile(path.resolve(options.solutionPath), 'utf8')) as SolverResult;
       assertFixedSeed(scenario.seed, saved.seed, options);
@@ -185,6 +215,10 @@ async function main(): Promise<void> {
     );
   } else if (options.command === 'solve') {
     let startingPolicy: PolicyWeights = DEFAULT_POLICY;
+    if (options.policyPath) {
+      startingPolicy = await readPolicy(options.policyPath);
+      console.error(`importing policy weights from ${options.policyPath}; saved metrics and fingerprints are not reused`);
+    }
     if (options.solutionPath) {
       const saved = JSON.parse(await readFile(path.resolve(options.solutionPath), 'utf8')) as SolverResult;
       assertFixedSeed(scenario.seed, saved.seed, options);
@@ -233,7 +267,8 @@ async function main(): Promise<void> {
       }, startingPolicy);
     }
   } else if (options.command === 'run') {
-    result = new TacticalSimulator(db, scenario).run();
+    const policy = options.policyPath ? await readPolicy(options.policyPath) : DEFAULT_POLICY;
+    result = new TacticalSimulator(db, scenario, policy).run();
   } else {
     throw new Error(`Unknown command: ${options.command}`);
   }
@@ -292,12 +327,41 @@ function parseArgs(args: string[]): CliOptions {
     else if (arg === '--html') { options.htmlPath = required(value, arg); index++; }
     else if (arg === '--fragment') { options.fragmentPath = required(value, arg); index++; }
     else if (arg === '--solution') { options.solutionPath = required(value, arg); index++; }
+    else if (arg === '--policy') { options.policyPath = required(value, arg); index++; }
     else if (arg === '--prefix') { options.prefixPath = required(value, arg); index++; }
     else if (arg === '--json') options.json = true;
     else if (arg === '--help' || arg === '-h') options.command = 'help';
     else throw new Error(`Unknown argument: ${arg}`);
   }
+  if (options.solutionPath && options.policyPath) {
+    throw new Error('--solution and --policy are mutually exclusive');
+  }
   return options;
+}
+
+async function readPolicy(filename: string): Promise<PolicyWeights> {
+  const parsed = JSON.parse(await readFile(path.resolve(filename), 'utf8')) as unknown;
+  const candidate = isRecord(parsed) && 'policy' in parsed ? parsed.policy : parsed;
+  if (!isPolicyWeights(candidate)) {
+    throw new Error(`Policy file ${filename} does not contain valid policy weights`);
+  }
+  return candidate;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isPolicyWeights(value: unknown): value is PolicyWeights {
+  if (!isRecord(value) || !isRecord(value.unitBias)) return false;
+  const requiredWeights: Array<keyof Omit<PolicyWeights, 'unitBias' | 'unitRisk'>> = [
+    'kill', 'bossKill', 'damage', 'counterDamage', 'lethalRisk', 'progress',
+    'danger', 'wall', 'heal', 'stayHealthy',
+  ];
+  return requiredWeights.every((key) => typeof value[key] === 'number')
+    && Object.values(value.unitBias).every((bias) => typeof bias === 'number')
+    && (value.unitRisk === undefined
+      || (isRecord(value.unitRisk) && Object.values(value.unitRisk).every((risk) => typeof risk === 'number')));
 }
 
 function required(value: string | undefined, flag: string): string {
@@ -439,15 +503,18 @@ function formatSummary(result: SolverResult): string {
 function printHelp(): void {
   console.log(`Fire Emblem level solver\n\n` +
     `  npm run solver -- inspect [--scenario FILE] [--project PATH]\n` +
-    `  npm run solver -- run [--seed N] [--out FILE] [--html FILE] [--json]\n` +
-    `  npm run solver -- plan --scenario FILE [--solution FILE] [--beam-width N] [--branch-limit N]\n` +
+    `  npm run solver -- run [--seed N] [--policy FILE] [--out FILE] [--html FILE] [--json]\n` +
+    `  npm run solver -- plan --scenario FILE [--solution FILE | --policy FILE] [--beam-width N] [--branch-limit N]\n` +
     `                         [--max-nodes N] [--damage-frontier 0..1] [--max-deaths N]\n` +
     `                         [--max-damage N] [--prefix FILE] [--solution-out FILE] [--html FILE]\n` +
     `  npm run solver -- prove --scenario FILE --max-damage N [--max-deaths N]\n` +
-    `                          [--max-nodes N] [--prefix FILE] [--solution FILE]\n` +
-    `  npm run solver -- solve [--iterations N] [--workers N] [--solution FILE] [--solution-out FILE] [--html FILE] [--fragment FILE]\n` +
+    `                          [--max-nodes N] [--prefix FILE] [--solution FILE | --policy FILE]\n` +
+    `  npm run solver -- solve [--iterations N] [--workers N] [--solution FILE | --policy FILE] [--solution-out FILE] [--html FILE] [--fragment FILE]\n` +
     `  npm run solver -- verify --solution FILE\n\n` +
-    `The scenario seed is a fixed benchmark input. Non-benchmark RNG diagnostics require both --seed-range A:B and --allow-seed-search.`);
+    `  npm run solver -- refresh --scenario FILE --solution FILE --solution-out FILE\n\n` +
+    `The scenario seed is a fixed benchmark input. --policy imports only heuristic weights and never trusts stale metrics. ` +
+    `refresh revalidates every action before migrating an old plan. Non-benchmark RNG diagnostics require both ` +
+    `--seed-range A:B and --allow-seed-search.`);
 }
 
 main().catch((error: unknown) => {

@@ -17,6 +17,13 @@ export interface EventGroupSpawnRule {
   groupNid: string;
   startingGroup?: string;
   trigger: EventSpawnTrigger;
+  onlyOnce: boolean;
+}
+
+export interface EventTurnRule {
+  id: string;
+  turn: number;
+  commands: ParsedEventCommand[];
 }
 
 export type EventInteractionType = 'visit' | 'chest' | 'door' | 'talk' | 'destructible';
@@ -33,6 +40,7 @@ export interface EventInteractionRule {
 export interface StandardEventPlan {
   events: EventPrefab[];
   initialCommands: ParsedEventCommand[];
+  turnRules: EventTurnRule[];
   spawnRules: EventGroupSpawnRule[];
   interactionRules: EventInteractionRule[];
 }
@@ -80,9 +88,25 @@ export function buildStandardEventPlan(db: Database, level: LevelPrefab): Standa
   return {
     events,
     initialCommands,
+    turnRules: deriveTurnRules(events),
     spawnRules: deriveGroupSpawnRules(events),
     interactionRules: deriveInteractionRules(events, level),
   };
+}
+
+export function deriveTurnRules(events: EventPrefab[]): EventTurnRule[] {
+  const rules: EventTurnRule[] = [];
+  for (const event of events) {
+    if (event.trigger !== 'turn_change') continue;
+    const trigger = parseTrigger(event.condition);
+    if (trigger?.type !== 'turn') continue;
+    rules.push({
+      id: `turn:${event.nid}`,
+      turn: trigger.turn,
+      commands: event._source.map(parseEventCommand).filter(isPresent),
+    });
+  }
+  return rules;
 }
 
 export function deriveInteractionRules(events: EventPrefab[], level: LevelPrefab): EventInteractionRule[] {
@@ -130,7 +154,13 @@ export function deriveGroupSpawnRules(events: EventPrefab[]): EventGroupSpawnRul
     }
     for (const [groupNid, startingGroup] of placements) {
       if (!groupNid) continue;
-      rules.push({ id: `${event.nid}:${groupNid}`, groupNid, startingGroup, trigger });
+      rules.push({
+        id: `${event.nid}:${groupNid}`,
+        groupNid,
+        startingGroup,
+        trigger,
+        onlyOnce: event.only_once,
+      });
     }
   }
   return rules;

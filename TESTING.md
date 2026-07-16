@@ -18,6 +18,9 @@ npx playwright install chromium
 # Run all visual tests
 npx playwright test
 
+# Replay the saved Chapter 4 plan through the live engine and diff every boundary
+npm run test:solver-parity
+
 # Run Sacred Stones reliability soak loop (defaults to 5 iterations)
 npm run test:ss:soak
 
@@ -54,11 +57,13 @@ game loop is **replaced** with a programmatic API exposed on `window.__harness`:
 | `loadLevel(nid)` | Load a level with events (level_start triggers normally) |
 | `loadLevelClean(nid)` | Load a level, skip all events, go straight to `free` state |
 | `settle(maxFrames)` | Auto-advance through events/menus until reaching `free` state |
-| `giveItem(unitNid, itemNid)` | Give a DB item to a unit (returns `true` on success). Item is inserted at front of inventory so it becomes equipped. |
+| `giveItem(unitNid, itemNid)` | Give a DB item to a unit (returns `true` on success) without reordering inventory. |
 | `setSeed(seed)` | Install a deterministic gameplay RNG stream for combat and level-ups |
 | `clearSeed()` | Restore normal `Math.random`-backed gameplay randomness |
 | `getSeedState()` | Read the current deterministic RNG state, or `null` when unseeded |
 | `getParityState()` | Capture normalized turn/phase/RNG/unit/item/region/layer state for solver differential checks |
+| `restoreTacticalCheckpoint(checkpoint)` | Restore an exact versioned solver checkpoint into the live tactical level |
+| `executePlannerAction(action)` | Validate and execute one planner attack/heal/move/wait/interaction, then settle at the next boundary |
 
 ### Headless Solver Tests
 
@@ -91,7 +96,7 @@ npm run solver -- plan --scenario solver/scenarios/chapter-4.json \
   --branch-limit 12 --max-nodes 30000
 npm run solver -- prove --scenario solver/scenarios/chapter-4.json \
   --solution solver/solutions/chapter-4.json \
-  --max-deaths 0 --max-damage 21 --max-nodes 1000000
+  --max-deaths 0 --max-damage 1 --max-nodes 1000000
 ```
 
 `plan` never scans gameplay seeds. It branches over validated player actions,
@@ -101,6 +106,10 @@ by replaying the explicit action list. Saved artifacts also carry a benchmark
 fingerprint for scenario, project data, engine source, and solver transition files.
 `--max-deaths 0` prunes a search to survival routes, while `--prefix FILE`
 continues from a validated turn-stamped action prefix without changing RNG.
+`--policy FILE` imports only heuristic weights from an older artifact. `refresh`
+is the explicit migration path for an old plan: it ignores stale reported
+metrics, replays every action on the scenario seed, and writes a new fingerprint
+only if the route still clears.
 Interaction coverage derives Chapter 5 visits/Natasha→Joshua/destructible
 villages and Chapter 3 chest/door rules, including lockpick use and rewards.
 `prove` enumerates the complete supported legal-action tree and says
@@ -112,6 +121,9 @@ an existing Chrome installation with:
 ```bash
 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
   npm run test:harness
+
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  npm run test:solver-parity
 ```
 
 ### Sacred Stones Reliability Soak
